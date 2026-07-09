@@ -1,24 +1,25 @@
-'use client'; // Required for Next.js interactive state
+'use client';
 
 import { useState, useEffect } from 'react';
 
-// Define the shape of a recommendation object returned by your Python API
 interface Recommendation {
   movie: string;
   score: number;
 }
 
 export default function MovieRecommender() {
-  // Add explicit TypeScript types to your React hooks
   const [movies, setMovies] = useState<string[]>([]);
   const [selectedMovie, setSelectedMovie] = useState<string>('');
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
+  // New State for Name Entry Screen
+  const [nameInput, setNameInput] = useState<string>('');
+  const [userName, setUserName] = useState<string>('');
+
   const API_URL = 'http://localhost:8000/api';
 
-  // Fetch the full movie list for the select dropdown on load
   useEffect(() => {
     fetch(`${API_URL}/movies`)
       .then((res) => {
@@ -27,17 +28,14 @@ export default function MovieRecommender() {
       })
       .then((data: { movies: string[] }) => {
         setMovies(data.movies);
-        if (data.movies.length > 0) {
-          setSelectedMovie(data.movies[0]);
-        }
+        if (data.movies.length > 0) setSelectedMovie(data.movies[0]);
       })
       .catch((err) => {
-        setError('❌ Could not connect to the Python ML server. Make sure it is running on port 8000.');
+        setError('❌ Could not connect to the Python ML server.');
         console.error(err);
       });
   }, []);
 
-  // Post the selected movie to get recommendation scores
   const handleRecommend = async () => {
     if (!selectedMovie) return;
     setLoading(true);
@@ -50,86 +48,134 @@ export default function MovieRecommender() {
         body: JSON.stringify({ movie: selectedMovie }),
       });
       const data = await response.json();
-      
       if (response.ok) {
         setRecommendations(data.recommendations);
       } else {
         setError(data.detail || 'Failed to get recommendations.');
       }
     } catch (err) {
-      setError('An error occurred while communicating with the backend.');
-      console.error(err);
+      setError('An error occurred.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleNameSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (nameInput.trim()) {
+      setUserName(nameInput.trim());
+    }
+  };
+
   return (
-    <div style={{ maxWidth: '600px', margin: '50px auto', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', padding: '20px', backgroundColor: '#ffffff', borderRadius: '8px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)', color: '#333' }}>
-      <h1 style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🎬 Movie Recommender</h1>
-      <p style={{ color: '#555', marginBottom: '30px' }}>
-        Select a movie you like, and we'll recommend others based on your custom local keywords file!
-      </p>
-
-      {error && (
-        <div style={{ backgroundColor: '#ffebee', color: '#c62828', padding: '12px', borderRadius: '4px', marginBottom: '20px' }}>
-          {error}
-        </div>
-      )}
-
-      <div style={{ marginBottom: '20px' }}>
-        <label htmlFor="movie-select" style={{ display: 'block', fontWeight: 'bold', marginBottom: '8px' }}>
-          Choose a movie:
-        </label>
-        <select
-          id="movie-select"
-          value={selectedMovie}
-          onChange={(e) => setSelectedMovie(e.target.value)}
-          style={{ width: '100%', padding: '12px', fontSize: '16px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fafafa', color: '#333' }}
-        >
-          {movies.map((movie) => (
-            <option key={movie} value={movie}>
-              {movie}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <button
-        onClick={handleRecommend}
-        disabled={loading || movies.length === 0}
-        style={{
-          width: '100%',
-          padding: '12px',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          backgroundColor: '#ff4b4b', // Streamlit theme red/coral flavor
-          color: '#ffffff',
-          border: 'none',
-          borderRadius: '4px',
-          cursor: loading ? 'not-allowed' : 'pointer',
-          opacity: loading ? 0.7 : 1
-        }}
-      >
-        {loading ? 'Crunching Similarity Scores...' : 'Recommend'}
-      </button>
-
-      {recommendations.length > 0 && (
-        <div style={{ marginTop: '40px' }}>
-          <h2 style={{ fontSize: '1.5rem', borderBottom: '2px solid #eaeaea', paddingBottom: '10px' }}>
-            If you liked <strong>{selectedMovie}</strong>, you might also like:
-          </h2>
-          
-          {recommendations.map((item) => (
-            <div key={item.movie} style={{ padding: '15px 0', borderBottom: '1px solid #eee' }}>
-              <h3 style={{ margin: '0 0 5px 0', fontSize: '1.25rem' }}>🍿 {item.movie}</h3>
-              <span style={{ fontSize: '14px', color: '#666', background: '#f0f2f6', padding: '3px 8px', borderRadius: '4px', display: 'inline-block' }}>
-                <strong>Similarity Score:</strong> {item.score.toFixed(2)}
-              </span>
+    <div className="min-h-screen bg-slate-50 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
+      <div className="max-w-xl w-full mx-auto">
+        
+        {/* STEP 1: WELCOME SCREEN (Displays if userName is empty) */}
+        {!userName ? (
+          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center space-y-6">
+            <div className="text-5xl">🍿</div>
+            <div>
+              <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight mb-2">
+                Welcome to Movie Recommender
+              </h1>
+              <p className="text-sm text-slate-500">
+                Let's customize your experience. What should we call you?
+              </p>
             </div>
-          ))}
-        </div>
-      )}
+
+            <form onSubmit={handleNameSubmit} className="space-y-4">
+              <input
+                type="text"
+                placeholder="Enter your name..."
+                value={nameInput}
+                onChange={(e) => setNameInput(e.target.value)}
+                maxLength={30}
+                className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-base text-center focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                required
+              />
+              <button
+                type="submit"
+                className="w-full bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white font-medium rounded-xl py-3 px-4 transition-all shadow-sm"
+              >
+                Get Started
+              </button>
+            </form>
+          </div>
+        ) : (
+          /* STEP 2: MAIN RECOMMENDER SCREEN (Displays after name submission) */
+          <div>
+            {/* Header Section */}
+            <div className="text-center mb-8">
+              <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight mb-2">
+                🎬 Hey, {userName}!
+              </h1>
+              <p className="text-sm text-slate-500">
+                Select a movie to crunch vector scores using your local dataset
+              </p>
+            </div>
+
+            {/* Main Card */}
+            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 mb-6">
+              {error && (
+                <div className="mb-4 p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="movie" className="block text-sm font-semibold text-slate-700 mb-2">
+                    What's your favorite movie?
+                  </label>
+                  <select
+                    id="movie"
+                    value={selectedMovie}
+                    onChange={(e) => setSelectedMovie(e.target.value)}
+                    className="w-full bg-slate-50 border border-slate-200 text-slate-800 rounded-xl px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all"
+                  >
+                    {movies.map((movie) => (
+                      <option key={movie} value={movie}>{movie}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleRecommend}
+                  disabled={loading || movies.length === 0}
+                  className="w-full bg-rose-500 hover:bg-rose-600 active:bg-rose-700 text-white font-medium rounded-xl py-3 px-4 transition-all shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Analyzing Keywords...' : 'Find Matches'}
+                </button>
+              </div>
+            </div>
+
+            {/* Results Section */}
+            {recommendations.length > 0 && (
+              <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+                <h2 className="text-lg font-bold text-slate-800 mb-4 pb-2 border-b border-slate-100">
+                  {userName}, because you liked <span className="text-rose-500">{selectedMovie}</span>:
+                </h2>
+                
+                <div className="space-y-3">
+                  {recommendations.map((item) => (
+                    <div 
+                      key={item.movie} 
+                      className="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100/80 transition-colors border border-slate-100"
+                    >
+                      <span className="font-medium text-slate-700">🍿 {item.movie}</span>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-50 text-rose-600 border border-rose-100">
+                        {Math.round(item.score * 100)}% Match
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+      </div>
     </div>
   );
 }
