@@ -33,10 +33,10 @@ def init_data():
     and constructs the ML token representations for textual vector matching.
     """
     global df, cosine_sim_matrix
-    wiki_path = "keywords-wiki.txt"
+    tmdb_path = "keywords-tmdb.txt"
     
-    if not os.path.exists(wiki_path):
-        raise FileNotFoundError(f"CRITICAL: {wiki_path} was not found inside directory workspace.")
+    if not os.path.exists(tmdb_path):
+        raise FileNotFoundError(f"CRITICAL: {tmdb_path} was not found inside directory workspace.")
         
     # Fetch live spreadsheet dataset state
     try:
@@ -50,7 +50,7 @@ def init_data():
 
     # Parse local text definitions file
     movies, descriptions = [], []
-    with open(wiki_path, "r", encoding="utf-8") as f:
+    with open(tmdb_path, "r", encoding="utf-8") as f:
         current_movie = None
         for line in f:
             line = line.strip()

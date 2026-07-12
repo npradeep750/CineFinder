@@ -1,0 +1,489 @@
+Movie: The Matrix
+Keywords: action sci fi man vs machine martial arts fortune teller artificial intelligence a i saving the world prophecy philosophy dystopia allegory insurgence chosen one simulated reality cyberpunk gnosticism
+
+Movie: Inception
+Keywords: action sci fi adventure mission dreams kidnapping spy allegory intellectual manipulation heist memory dream world subconscious admiring high concept dream
+
+Movie: Interstellar
+Keywords: adventure drama sci fi spacecraft race against time artificial intelligence a i nasa time warp dystopia expedition time travel space travel wormhole famine hibernation black hole quantum mechanics family relationships space planet astronaut scientist single father space station gravity space adventure time manipulation cryonics father daughter relationship 2060s enthusiastic epic sci fi
+
+Movie: Star Wars franchise
+Keywords: adventure action sci fi empire galaxy rebellion android hermit smuggling contraband freedom rebel rescue mission space planet desert super power oppression space opera wizard totalitarianism quest tuwaderalit
+
+Movie: Star Trek (2009)
+Keywords: sci fi action adventure spacecraft teleportation san francisco california space battle time travel space mission parachute black hole supernova prequel futuristic warp speed warp engine space romulans space opera reboot unlikely friendship child driving car alternative reality 23rd century based on tv series 24th century suspenseful excited exhilarated
+
+Movie: 2001: A Space Odyssey
+Keywords: sci fi mystery adventure man vs machine moon jupiter artificial intelligence a i based on novel or book technology super computer space travel space mission moon base astronaut evolution monolith space station space opera philosophical 2000s ai rebellion suspenseful complicated metrocolor
+
+Movie: The Martian
+Keywords: sci fi drama adventure spacecraft planet mars based on novel or book nasa isolation botanist survival space engineering stranded astronaut struggle for survival aftercreditsstinger duringcreditsstinger deep space philosophical 2030s faithful adaptation cheerful optimistic
+
+Movie: Project Hail Mary
+Keywords: sci fi adventure friendship coma based on novel or book bravery sun language barrier space travel space mission alien space memory loss astronaut scientist calm science teacher save the planet spaceship interspecies friendship amused earnest epic sci fi
+
+Movie: Gravity
+Keywords: sci fi thriller drama space mission loss space astronaut space station trapped in space reflective hopeful
+
+Movie: Dune
+Keywords: sci fi adventure war empire future army prophecy dystopia emperor sand spice chosen one hallucinogen treason baron revenge premonition betrayal space water shortage creature desert knife fight destiny giant worm space opera sand dune messiah complex mother son relationship giant creature epic sci fi
+
+Movie: Dune: Part Two
+Keywords: sci fi adventure sandstorm chosen one distant future creature planet desert destiny giant worm space opera sand dune allegorical messiah fall from grace vengeance religious allegory giant creature power ambiguous antagonistic melodramatic epic sci fi
+
+Movie: Arrival
+Keywords: drama sci fi mystery spacecraft extraterrestrial technology loss time alien language female protagonist scientist heartbreak based on short story alien contact military alien language linguist first contact communication linguistics time manipulation complex determinism science fiction wistful incredulous hopeful
+
+Movie: Edge of Tomorrow
+Keywords: action sci fi deja vu based on novel or book restart military officer dystopia affectation time travel training alien time loop soldier alien invasion war hero exoskeleton somber anxious soldiers war sentimental romantic admiring adoring commanding defiant dignified earnest empathetic 2020s
+
+Movie: The Terminator
+Keywords: action thriller sci fi man vs machine artificial intelligence a i saving the world laser gun cyborg killer robot shotgun rebel dystopia villain time travel female protagonist los angeles california urban setting future war savior tech noir time paradox action hero griffith observatory good versus evil murders
+
+Movie: Terminator 2: Judgment Day
+Keywords: action thriller sci fi man vs machine artificial intelligence a i cyborg shotgun dystopia moral ambiguity post apocalyptic future villain time travel sequel mental institution juvenile delinquent fictional war urban setting troubled teen morphing nuclear weapons shape shifter savior catch phrase action hero good versus evil suspenseful
+
+Movie: Men in Black
+Keywords: action adventure comedy sci fi new york city cannon space marine flying saucer undercover secret identity superhero deportation illegal immigration new identity stay permit giant cockroach based on comic alien buddy cop fictional government agency hilarious intense
+
+Movie: Bumblebee
+Keywords: action adventure sci fi technology based on toy giant robot robot spin off duringcreditsstinger 1980s adoring
+
+Movie: War of the Worlds (2005)
+Keywords: sci fi thriller government attack privacy surveillance found footage cybersecurity district online privacy screenlife war
+
+Movie: Pacific Rim
+Keywords: action sci fi adventure monster dystopia giant monster pacific alaska giant robot apocalypse hong kong robot alien invasion kaiju duringcreditsstinger monster movie
+
+Movie: Ex Machina
+Keywords: drama sci fi android dancing friendship man vs machine distrust artificial intelligence a i isolation technology manipulation high technology treason deception norway laboratory robot power outage surveillance rich surveillance camera consciousness employer employee relationship isolated house wealthy man existentialism lockdown emotional intelligence female cyborg human android relationship tech company critical intense
+
+Movie: Jurassic Park
+Keywords: adventure sci fi exotic island island triceratops brontosaurus electric fence dna tyrannosaurus rex paleontology dinosaur amusement park theme park
+
+Movie: Jurassic World
+Keywords: sci fi adventure action island secret mission tyrannosaurus rex spinosaurus sequel stranded dinosaur family genetic experiment mosasaurus indifferent
+
+Movie: Pirates of the Caribbean: The Curse of the Black Pearl
+Keywords: adventure fantasy action ship blacksmith gold exotic island governor skeleton jamaica british empire pirate swashbuckler 18th century caribbean sea aftercreditsstinger pirate ship british navy tortuga based on theme park ride hilarious brisk
+
+Movie: Pirates of the Caribbean: Dead Man’s Chest
+Keywords: adventure fantasy action witch daughter ship exotic island monster fortune teller compass sequel sword fight pirate cannibal swashbuckler kraken aftercreditsstinger based on theme park ride witty
+
+Movie: Pirates of the Caribbean: At World’s End
+Keywords: adventure fantasy action exotic island strong woman love of one s life afterlife traitor singapore shipwreck sequel sword fight pirate monkey swashbuckler flying dutchman rum sailing ship aftercreditsstinger british navy mass hanging playful whimsical celebratory excited joyful
+
+Movie: The Adventures of Tintin
+Keywords: adventure animation mystery treasure riddle morocco belgium treasure hunt liquor based on comic sunken treasure reporter belgian motion capture 1950s 3d animation excited
+
+Movie: Indiana Jones and the Raiders of the Lost Ark
+Keywords: adventure comedy animation action family sci fi war
+
+Movie: Indiana Jones and the Last Crusade
+Keywords: adventure action saving the world nazi holy grail venice italy entrapment crusader germany riddle brotherhood zeppelin tank book burning sequel nazi officer boat chase gestapo single father traveling circus archaeologist bible quote medieval boy scouts german soldier motorcycle chase hindenburg german agent 1930s biblical archaeology father son relationship adolf hitler knights templar nazi germany the crusades joyous excited
+
+Movie: The Mask of Zorro
+Keywords: action adventure california hero horseback riding spy superhero sword fight revenge vigilante swashbuckler action hero zorro vigilante justice
+
+Movie: The Princess Bride
+Keywords: adventure fantasy romance family dreams based on novel or book narration wrestling miracle sword fight revenge boat chase pirate wedding swashbuckler evil prince screwball impersonation giant man story within the story hidden identity fictitious country grandfather grandson relationship battle of wits romantic adoring enchant fairytale
+
+Movie: The Mummy (1999)
+Keywords: adventure action fantasy egypt cairo library secret passage pastor pyramid sandstorm solar eclipse mummy foreign legion nile secret society treasure hunt remake archaeologist tomb book of the dead ancient egypt opposites attract 1920s pharoah playful good versus evil suspenseful witty exhilarated egyptian god
+
+Movie: Kingsman: The Secret Service
+Keywords: crime comedy action adventure great britain spy secret organization microchip secret agent training based on comic implant united kingdom duringcreditsstinger global threat abusive stepfather
+
+Movie: John Wick
+Keywords: action thriller hitman bratva russian mafia gangster secret organization revenge murder dog retired widower
+
+Movie: The Accountant
+Keywords: mystery crime thriller hitman autism sequel conspiracy whodunit insecure accountant mysterious death brother brother relationship grand incredulous excited hum
+
+Movie: The Bourne Identity
+Keywords: action mystery thriller assassin amnesia paris france based on novel or book escape barcelona spain spy secret identity passport mission of murder lovers flashback shootout foot chase cell phone multiple identities surveillance camera hamburg germany fishing boat langley virginia safe deposit box hand to hand combat political thriller thoughtful action hero bourne jason bourne globe trotter
+
+Movie: The Bourne Supremacy
+Keywords: action drama thriller sniper assassin berlin germany amnesia based on novel or book espionage lie sequel on the run shootout foot chase exploding house one against many rail car dark past moscow russia hand to hand combat action hero bourne jason bourne dramatic suspenseful
+
+Movie: The Bourne Ultimatum
+Keywords: action drama mystery thriller assassin central intelligence agency cia corruption paris france based on novel or book madrid spain espionage prosecution fake identity revelation europe interpol sequel flashback on the run conspiracy shootout motorcycle foot chase dark past langley virginia moscow russia frantic action hero security leak investigative reporter jason bourne furious
+
+Movie: Mission: Impossible - Ghost Protocol
+Keywords: action thriller adventure mask assassin budapest hungary skyscraper secret intelligence service sandstorm seattle washington satellite fake identity mumbai bombay india car crash sequel prison escape dubai secret government organization infiltration billionaire terrorism disguise bombing nuclear threat undercover operation fictional government agency moscow russia clandestine analyst government agency nuclear submarine based on tv series suspenseful amused
+
+Movie: Mission: Impossible - Rogue Nation
+Keywords: action adventure mask mission assassin london england spy morocco villain fake identity austria europe double agent sequel secret government organization conspiracy infiltration mi6 mole vienna austria british prime minister vienna opera fictional government agency british intelligence government agency based on tv series
+
+Movie: Mission: Impossible - Fallout
+Keywords: action adventure mask race against time london england central intelligence agency cia helicopter paris france chase gun spy countdown fake identity stunt fistfight double agent norway sequel secret government organization infiltration mi6 motorcycle killer bomb remote detonator nuclear weapons handgun fictional government agency hand to hand combat motorcycle chase government agency french police helicopter chase based on tv series action
+
+Movie: Mission: Impossible - Dead Reckoning Part 1
+Keywords: action adventure thriller mask race against time mission rome italy chase secret mission spy fake identity secret agent sequel intelligence agency secret government organization infiltration fictional government agency rogue agent government agency based on tv series action
+
+Movie: Mission: Impossible - The Final Reckoning
+Keywords: action thriller adventure mask artificial intelligence a i diving submarine espionage spy nuclear missile fake identity secret agent stunt sequel secret government organization infiltration terrorist plot fictional government agency misinformation government agency based on tv series
+
+Movie: Top Gun: Maverick
+Keywords: action drama fighter pilot u s navy sequel nuclear weapons military aircraft carrier naval aviation war
+
+Movie: Casino Royale
+Keywords: adventure action thriller banker casino based on novel or book poker italy spy money torture terrorism mi6 british secret service montenegro james bond dramatic suspenseful thriller action adventure earnest
+
+Movie: Skyfall
+Keywords: action adventure thriller spy aston martin secret agent sociopath police impersonator hacking mi6 killer art gallery british secret service uzi booby trap macao globetrotting helicopter crash scottish highlands james bond intense vibrant
+
+Movie: No Time to Die
+Keywords: action thriller adventure biological weapon based on novel or book parent child relationship forgiveness poison spy mi6 family british secret service parents global threat somber nanobots james bond bold
+
+Movie: Mad Max: Fury Road
+Keywords: action adventure sci fi rescue australia dystopia sandstorm post apocalyptic future sequel survival on the run peak oil dark future intense desert wasteland convoy attack high speed chase freedom quest road warfare modified vehicles war boys tyrannical ruler
+
+Movie: Kill Bill: Vol. 1
+Keywords: action crime martial arts japan kung fu sword yakuza sword fight revenge vigilante female yakuza female protagonist samurai sword retribution dreary extreme violence
+
+Movie: Baby Driver
+Keywords: action crime robbery waitress atlanta crime boss romance heist getaway car on the run shootout bank robbery getaway driver sign languages armed robbery hearing impaired music bewildered
+
+Movie: Speed
+Keywords: action thriller s w a t bomber bus bomb los angeles california falling elevator bomb planting lapd trapped in an elevator subway train bomb explosion ransom demand aggressive extortionist santa monica california bomb vest suspenseful intense bold excited city bus bus passengers trapped in a vehicle
+
+Movie: Twisters
+Keywords: action thriller dying and death rodeo climate twister natural disaster oklahoma storm chaser sequel meteorologist duringcreditsstinger disaster movie weather chasers social media influencer youtuber extreme weather hilarious exhilarated science experiment
+
+Movie: The Good, The Bad and the Ugly
+Keywords: western gold army bounty hunter hitman refugee anti hero moral ambiguity gallows outlaw gun battle shootout spaghetti western graveyard american civil war stolen gold quest complex hidden gold tense gun death excited cemetary confederate gold
+
+Movie: 3:10 to Yuma
+Keywords: western drama thriller hotel small town arizona hunger ranch outlaw shootout black and white train bandit stagecoach based on short story drought 19th century
+
+Movie: No Country for Old Men
+Keywords: crime thriller western vietnam veteran sheriff trailer park based on novel or book hitman psychopath drug trafficking texas motel usa–mexico border drug cartel fate desert modern day western neo western tracking device cold blooded killer motel room cartel neo noir 1980s mexican cartel drug deal coin toss human nature captive bolt gun western noir horror western faithful adaptation doubtful
+
+Movie: Django Unchained
+Keywords: drama western rescue friendship bounty hunter ku klux klan texas slavery plantation revenge racism slave trade black slave 19th century white supremacy deep south old west mississippi
+
+Movie: Rango
+Keywords: animation comedy family western adventure hero gunslinger sheriff suicide attempt nevada mayor pet native american water supply outlaw water shortage spirit chameleon mariachi disillusionment desert construction frontier town small western town animal life animal protagonist 3d animation old west high noon
+
+Movie: The Godfather
+Keywords: drama crime based on novel or book loss of loved one love at first sight italy gangster symbolism patriarch europe organized crime mafia religion revenge motive crime family sicilian mafia religious hypocrisy gun violence rise to power gang violence 1940s 1950s mafia war excited oscar winner
+
+Movie: The Godfather Part II
+Keywords: drama crime new year s eve new york city based on novel or book italian american cuba italy gangster praise blackmail symbolism senator sequel revenge murder betrayal organized crime extortion mafia lawyer suburb sicilian mafia corrupt politician 1950s new year violence
+
+Movie: Goodfellas
+Keywords: drama crime prison florida new york city based on novel or book gangster mass murder drug trafficking 1970s irish american gore biography based on true story murder organized crime mafia brooklyn new york city crime epic tampa florida
+
+Movie: Reservoir Dogs
+Keywords: crime thriller escape jewelry psychopath traitor ear heist thief betrayal plan gone wrong gang nonlinear timeline warehouse told in flashback heist gone wrong botched robbery angry desperate based on short film suspenseful antagonistic
+
+Movie: A Few Good Men
+Keywords: drama underdog dying and death suicide navy right and justice court case suspicion of murder guantanamo bay marine corps military court code red command military base u s navy sexism based on play or musical flashback court martial platoon leader military law legal thriller
+
+Movie: 12 Angry Men
+Keywords: drama death penalty anonymity court case judge jurors innocence witness knife matter of life and death based on play or musical trial murder debate capital punishment black and white courtroom angry courtroom drama huis clos baffled derisive foreboding
+
+Movie: The Usual Suspects
+Keywords: drama crime thriller new york city robbery relatives heist flashback police corruption whodunit los angeles california theft criminal criminal mastermind cargo ship mind game neo noir mystery villain suspenseful intense excited rashomon effect
+
+Movie: L.A. Confidential
+Keywords: crime mystery thriller corruption based on novel or book call girl shotgun detective femme fatale domestic violence whodunit corpse district attorney movie star good cop bad cop neo noir 1950s
+
+Movie: Sicario
+Keywords: action crime thriller mission assassin central intelligence agency cia mexico corruption bomb fbi smoking texas border manipulation cynicism revenge murder dirty cop brutality drugs special forces interrogation desert surveillance blunt night vision death of daughter moral dilemma neo noir death of wife mexican cartel serious secret tunnel violence juárez mexico
+
+Movie: Ocean’s Eleven
+Keywords: thriller crime casino pickpocket heist con artist remake caper las vegas inside man security guard ex wife ex con card dealer explosives expert security system casino owner professional thief fight night master plan computer hacker distractions museum curator casino vault contortionist
+
+Movie: Snatch
+Keywords: crime comedy robbery trailer park england gypsy gambling bare knuckle boxing slang diamond antwerp pig gangster boxer caper underground fighting diamond heist pikey farce excited
+
+Movie: Catch Me If You Can
+Keywords: drama crime fbi con man biography based on true story con artist chameleon attempted jailbreak engagement party mislaid trust christmas bank fraud conman fraudster assertive compassionate
+
+Movie: BlacKkKlansman
+Keywords: crime comedy drama history based on novel or book ku klux klan 1970s black panther party biography based on true story undercover cop racism based on memoir or autobiography revisionist history white supremacy thoughtful defiant kkk rally
+
+Movie: Inglourious Basterds
+Keywords: drama thriller war guerrilla warfare paris france self sacrifice world war ii jew persecution german occupation of france resistance fighter nazism anti fascism enthusiastic excited
+
+Movie: Hacksaw Ridge
+Keywords: drama history war japan hero world war ii abusive father pacifism bible gore vegetarian biography based on true story okinawa conscientious objector religion soldier alcoholic war hero pacifist medic us military battle of okinawa congressional medal of honor admiring combat medic weaponless seventh day adventists
+
+Movie: Saving Private Ryan
+Keywords: war drama history dying and death self sacrifice bravery world war ii duty normandy france troops waffen ss omaha beach rescue mission cowardice us army based on true story d day military german soldier military operation 1940s bloody deaths u s army soldier u s army ranger massive casualties
+
+Movie: 1917
+Keywords: war history drama race against time world war i british army survival soldier period drama real time trenches 1910s trench warfare no man s land intense horrified war epic
+
+Movie: Guy Ritchie’s The Covenant
+Keywords: war action thriller ambush interpreter afghanistan rescue mission afghanistan war 2001 2021 taliban behind enemy lines wounded soldier war trauma covenant
+
+Movie: Lone Survivor
+Keywords: war action drama based on novel or book fight afghanistan biography based on true story taliban survival u s navy seal military dangerous mission soldiers bold
+
+Movie: Kingdom of Heaven (Director's Cut)
+Keywords: drama action adventure history war blacksmith muslim crusade jerusalem catapult swordsman battlefield knight religion epic battle desert battle knight templars 12th century saladin christian ambiguous awestruck sword battle
+
+Movie: Life is Beautiful
+Keywords: comedy drama dying and death bookshop love of one s life nazi self sacrifice loss of loved one italy riddle mass murder concentration camp fascism holocaust shoah world war ii deportation jew persecution story teller riding a bicycle national socialism dark comedy charade concentration camp prisoner romcom dark war nazi germany hopeful
+
+Movie: Dunkirk
+Keywords: war action drama army beach france allies raf royal air force military officer world war ii evacuation pilot british army rescue mission europe based on true story royal navy survival historical fiction soldier period drama private military dunkirk 1940s intense awestruck foreboding best picture nominee oscar winner
+
+Movie: The Social Network
+Keywords: drama hacker based on novel or book boston massachusetts ex girlfriend biography based on true story historical fiction university twins docudrama blunt social media legal drama conceited
+
+Movie: Schindler’s List
+Keywords: drama history war factory hero nazi concentration camp ss nazi schutzstaffel holocaust shoah world war ii ghetto jew persecution kraków poland defense industry auschwitz birkenau concentration camp biography based on true story industrialist historical fiction black and white train period drama poland evil historical drama disheartening
+
+Movie: Gladiator
+Keywords: action drama adventure gladiator rome italy arena senate roman empire parent child relationship emperor slavery ancient rome revenge battlefield slave auction historical fiction ancient world period drama combat chariot philosopher grim barbarian horde 2nd century successor commodus maximus antiquity gladiador
+
+Movie: Braveheart
+Keywords: action drama history war england scotland loss of loved one idealism based on true story catholic medieval war dramatic powerful
+
+Movie: Lawrence of Arabia
+Keywords: adventure history war cairo world war i arabian horse jerusalem british army british empire damascus camel based on true story historical fiction quicksand desert arab thoughtful ottoman empire provocative
+
+Movie: Oppenheimer
+Keywords: drama history husband wife relationship based on novel or book atomic bomb patriotism new mexico world war ii atomic bomb test physics biography based on true story antisemitism interrogation guilt historical event nuclear weapons communism red scare mccarthyism top secret project moral dilemma usa politics 1940s 20th century manhattan project los alamos
+
+Movie: The Aviator
+Keywords: drama ladykiller pilot biography based on true story womanizer phobia aviation period drama u s congress flying boat test flight
+
+Movie: Sully
+Keywords: drama history rescue new york city airplane investigation pilot based on true story emergency landing flight aviation airplane accident based on memoir or autobiography bird attack hudson river duringcreditsstinger powerful
+
+Movie: Ford v Ferrari
+Keywords: drama history action based on novel or book car race sports car mechanic biography based on true story le mans racing race car driver frantic 1960s motorsport
+
+Movie: Rush
+Keywords: action comedy crime martial arts fbi two man army chinese mafia cop los angeles california east asian lead buddy cop consul crime lord art treasures child kidnapping duringcreditsstinger action hero hilarious
+
+Movie: F1
+Keywords: action drama sports comeback racing race car driver sport competition aftercreditsstinger beforecreditsstinger rookie formula one f1 motorsport car racing disdainful exhilarated joyful
+
+Movie: Moneyball
+Keywords: drama underdog california sports baseball based on true story oakland california job transfer oakland athletics talent manager statistics 2000s major league baseball mlb inspirational sports industry
+
+Movie: The Pianist
+Keywords: drama war concert nazi resistance warsaw ghetto polish resistance homeland holocaust shoah hunger world war ii prisoner of war ghetto deportation jew persecution liberation biography based on true story survival tragedy based on memoir or autobiography pianist poland tearjerker angry complex
+
+Movie: The Wolf of Wall Street
+Keywords: crime drama comedy corruption based on novel or book drug addiction anti hero con man fraud wall street biography based on true story rise and fall con artist money stockbroker wealthy drugs stripping hedonism decadence corrupt 1980s sharemarket fraud desire for fame financial market fame seeking black monday based on real person financial drama
+
+Movie: Bohemian Rhapsody
+Keywords: music drama london england aids musician 1970s biography based on true story singer hiv male homosexuality fame rock band lgbt 1980s gay theme excited
+
+Movie: Rocketman
+Keywords: music drama london england drug abuse pop star 1970s musical biography based on true story alcoholism singer rock music los angeles california pianist lgbt rise to fame 1960s gay theme
+
+Movie: Marvel Cinematic Universe
+Keywords: 
+
+Movie: Batman Begins
+Keywords: drama crime action martial arts undercover loss of loved one secret identity crime fighter superhero based on comic rivalry ninja vigilante tragic hero super power haunted by the past evil doctor master villain unfulfilled love inspirational
+
+Movie: The Dark Knight
+Keywords: action crime thriller sadism chaos secret identity crime fighter superhero anti hero scarecrow based on comic vigilante organized crime tragic hero anti villain criminal mastermind district attorney super power super villain neo noir bold
+
+Movie: The Dark Knight Rises
+Keywords: action crime drama thriller airplane fight burglar hostage secret identity crime fighter superhero villainess time bomb based on comic cover up vigilante tragic hero mobile terrorism destruction fighting criminal underworld cat burglar flood
+
+Movie: Man of Steel
+Keywords: action adventure sci fi saving the world flying hope superhero based on comic alien planet superhuman alien invasion super power mysterious force reboot save the day dc extended universe dceu save the planet origin story alien spaceship bold defiant vibrant
+
+Movie: Joker
+Keywords: crime thriller drama society based on comic social commentary psychological thriller criminal mastermind mental illness anarchy character study clown makeup outsider prophetic social realism tv host 1980s mother son relationship origin story falling into madness anti capitalist best picture nominee oscar winner
+
+Movie: Shazam!
+Keywords: action comedy fantasy philadelphia pennsylvania magic secret identity superhero based on comic origin of hero wizard superhuman strength aftercreditsstinger duringcreditsstinger christmas dc extended universe dceu flossing
+
+Movie: Blue Beetle
+Keywords: action sci fi adventure armor superhero family relationships family high tech job hunting mexican american aftercreditsstinger duringcreditsstinger immigrant family college graduate dc extended universe dceu alien technology brother sister relationship latino
+
+Movie: Superman (2025)
+Keywords: sci fi adventure action dual identity superhero based on comic dog super power reboot kaiju modern day adaptation aftercreditsstinger duringcreditsstinger epic battle supervillain calm dc universe dcu anti imperialism adoring amused bold cheerful enthusiastic blockbuster alien heritage symbol of hope journalistic investigation city destruction world‑saving mission
+
+Movie: X-Men
+Keywords: sci fi fantasy action egypt hero superhero mutant based on comic sequel superhuman super power superhero team world domination aftercreditsstinger 1980s origin appreciative
+
+Movie: Deadpool
+Keywords: action comedy sci fi hero superhero anti hero mutant breaking the fourth wall aftercreditsstinger duringcreditsstinger marvel cinematic universe mcu mutants superhero teamup
+
+Movie: Deadpool & Wolverine
+Keywords: action comedy sci fi hero superhero anti hero mutant breaking the fourth wall aftercreditsstinger duringcreditsstinger marvel cinematic universe mcu mutants superhero teamup
+
+Movie: V for Vendetta
+Keywords: action thriller sci fi government detective revolution dystopia fascism fascist chancellor based on comic revenge female protagonist torture hatred masked vigilante vengeful spirit activist political thriller thoughtful vengeful
+
+Movie: The Shawshank Redemption
+Keywords: drama crime prison friendship police brutality corruption based on novel or book freedom hope prison cell delinquent redemption parole board prison escape wrongful imprisonment interracial friendship framed for murder 1940s voiceover dramatic powerful epic
+
+Movie: Se7en
+Keywords: crime mystery thriller rage and hate police s w a t sadism self fulfilling prophecy psychopath detective investigation insomnia murder serial killer religion shootout corpse seven deadly sins depravity neo noir urban gothic anxious grimdark suspenseful seven los siete pecados capitales
+
+Movie: Zodiac
+Keywords: crime mystery thriller newspaper journalist california based on novel or book police san francisco california killing detective 1970s investigation victim code murder serial killer crime scene reporter whodunit alcoholic true crime young man fourth of july newspaper article cartoonist 1960s zodiac killer malicious clinical bar ambiguous awestruck foreboding frightened
+
+Movie: The Prestige
+Keywords: drama mystery sci fi dying and death suicide class society london england magic competition obsession hostility class diary twist tricks illusion rivalry partner steampunk cruelty hanging jail cell shocking 19th century nikola tesla magician tesla coil bittersweet secret direct mind blowing antagonistic
+
+Movie: The Illusionist
+Keywords: fantasy drama thriller romance princess magic rivalry love vienna austria super power crown prince duchess mysterious childhood sweetheart romantic
+
+Movie: Memento
+Keywords: mystery thriller drug dealer amnesia insulin tattoo waitress motel manipulation flashback confusion revenge murder memory loss memory psychological thriller whodunit los angeles california polaroid based on short story nonlinear timeline mourning insurance agent individuality phone call paranoid neo noir somber reverse chronology complex bewildered bold
+
+Movie: Die Hard
+Keywords: action thriller husband wife relationship based on novel or book s w a t fbi christmas party vault heist murder shootout los angeles california terrorism one man army explosion police officer hostage negotiator one night lapd christmas 1980s action hero hostages absurd high octane suspenseful amused
+
+Movie: One Battle After Another
+Keywords: thriller crime comedy rebellion based on novel or book resistance usa–mexico border riot interracial relationship on the run xenophobia aftercreditsstinger missing daughter white supremacy anti fascism father daughter relationship revolutionaries african american anti racism immigration detention center
+
+Movie: Fight Club
+Keywords: drama thriller dual identity rage and hate based on novel or book nihilism fight support group dystopia insomnia alter ego breaking the fourth wall split personality quitting a job dissociative identity disorder self destructiveness
+
+Movie: Parasite
+Keywords: comedy thriller drama dark comedy con artist social commentary working class infiltration psychological thriller class differences family unemployed domestic worker wealthy family south korea introspective caste violence seoul south korea anti capitalist oscar winner
+
+Movie: Shutter Island
+Keywords: drama thriller mystery island based on novel or book concentration camp world war ii hurricane investigation psychiatric hospital mental institution escaped patient psychologist psychological thriller doctor missing person ex military neo noir criminally insane 1950s haunting past visions mystery depressing dachau
+
+Movie: The Game
+Keywords: history drama thriller war england homophobia world war ii mathematician genius biography based on true story male homosexuality code breaking lgbt logician cryptography math genius gay theme inspirational codes
+
+Movie: Knives Out
+Keywords: comedy crime mystery immigrant detective massachusetts investigation big family mansion whodunit family home murder mystery neo noir privilege suspenseful excited
+
+Movie: Wake Up Dead Man: A Knives Out Mystery
+Keywords: thriller mystery comedy dark comedy sequel whodunit murder investigation murder mystery upstate new york web of lies mystery thriller hidden motives clue‑based deduction high‑society secrets eccentric detective manipulative personalities hidden relationships isolated mansion character‑driven mystery
+
+Movie: Good Will Hunting
+Keywords: drama boston massachusetts mathematics genius male friendship flashback psychologist janitor dating courtroom group of friends southie college professor prodigy math genius foster kid fear of change witty abused as a child massachusetts institute of technology mit math professor
+
+Movie: Whiplash
+Keywords: drama music thriller new york city jazz musician obsession music teacher conservatory drums montage perfectionist public humiliation jazz band angry aggressive young adult music school verbal abuse emotional abuse anxious based on short film psychological drama romantic bold disapproving enraged drummer
+
+Movie: Cast Away
+Keywords: adventure drama exotic island suicide attempt volleyball survival remarriage loneliness castaway airplane crash presumed dead deserted island tropical island south pacific intense bold melodramatic
+
+Movie: The Grand Budapest Hotel
+Keywords: comedy drama hotel painting wartime eastern europe author gunfight theft period drama bellhop mentor protégé relationship european hotel lobby renaissance painting 1960s 1930s hilarious
+
+Movie: The Lord of the Rings: The Fellowship of the Ring
+Keywords: adventure fantasy action based on novel or book elves dwarf magic obsession allegory bravery castle troll battle demon uncle nephew relationship fantasy world dark fantasy journey companionship magical creature live action and animation hero s journey wraith sword and sorcery wonder trekking anxious good versus evil wistful christian allegory magical ring comforting tolkien epic fantasy epic
+
+Movie: The Lord of the Rings: The Two Towers
+Keywords: adventure fantasy action mission based on novel or book elves dwarf magic obsession allegory bravery castle reincarnation sequel split personality fantasy world wizard epic battle journey companionship live action and animation hero s journey high fantasy wraith sword and sorcery trekking anxious evil spell good versus evil admiring bold winged creatures tolkien epic fantasy
+
+Movie: The Lord of the Rings: The Return of the King
+Keywords: adventure fantasy action army based on novel or book elves dwarf magic kingdom obsession bravery castle volcano giant spider sequel honor king madness split personality fantasy world wizard epic battle journey ring companionship magical creature quest live action and animation hero s journey high fantasy wraith sword and sorcery power madness complex trekking good versus evil sword making wistful cheerful comforting melodramatic winged creatures epic fantasy
+
+Movie: Harry Potter franchise
+Keywords: adventure fantasy witch school friend friendship london england based on novel or book magic boarding school male friendship child hero school of witchcraft chosen one bullying school ghost nostalgic fantasy world wizard pre teen calm children s adventure based on young adult novel found family teen adventure owl male female friendship admiring adoring teen fantasy
+
+Movie: Dungeons & Dragons: Honor Among Thieves
+Keywords: adventure fantasy comedy video game platonic love gang of thieves friends dragon role playing game rpg based on video game female villain heist gone wrong wizard duringcreditsstinger illusionist father daughter relationship d&d wizardry dungeon crawling based on game
+
+Movie: How to Train Your Dragon (2025)
+Keywords: fantasy family action adventure flying vikings norsemen remake dragon battle warrior live action remake reminiscent
+
+Movie: Crazy Rich Asians
+Keywords: comedy romance based on novel or book professor singapore wedding east asian lead wealthy family asian american
+
+Movie: The Truman Show
+Keywords: comedy drama escape paranoia dystopia dark comedy suspicion video surveillance deception hidden camera simulated reality television producer tv show in film make believe actor
+
+Movie: Rush Hour
+Keywords: action comedy crime martial arts fbi two man army chinese mafia cop los angeles california east asian lead buddy cop consul crime lord art treasures child kidnapping duringcreditsstinger action hero hilarious
+
+Movie: The Dictator
+Keywords: comedy petrol culture clash dictator coup d etat satire parody uncle conspiracy female soldier united nations weapon of mass destruction dissident grocery store identity swap hilarious
+
+Movie: The Mask
+Keywords: comedy fantasy crime romance dual identity bank superhero mockery transformation villain surrealism based on comic slapstick comedy balloon dog urban setting jail cell super villain norse mythology supernatural power
+
+Movie: Bruce Almighty
+Keywords: fantasy comedy new love lovesickness moon street gang moses faith prayer christianity journalism car crash god religion relationship super power news reporter female journalist religious conflict responsibility praying almighty ambiguous
+
+Movie: Ted
+Keywords: comedy fantasy friendship dreams satire love buddy teddy bear toy comes to life wishes come true
+
+Movie: Tropic Thunder
+Keywords: action comedy war vietnam movie business satire parody jungle movie star southeast asia land mine shackles taunting duringcreditsstinger blackface method acting playful provocative critical jungle adventure amused audacious bold exuberant inflammatory sardonic
+
+Movie: Don’t Look Up
+Keywords: comedy sci fi drama artificial intelligence a i the white house asteroid climate change satire global warming comet end of the world social commentary social satire meteorite astronomer disaster teacher student relationship denial mass hysteria aftercreditsstinger duringcreditsstinger reflective tragic
+
+Movie: The Sixth Sense
+Keywords: mystery thriller drama dying and death child abuse philadelphia pennsylvania sense of guilt afterlife marriage crisis loss of loved one confidence psychology paranormal phenomena single psychological thriller cowardliness single mother school play ghost kids spiritism somber anxious supernatural horror ghost child psychological horror dramatic suspenseful supernatural thriller
+
+Movie: Obsession
+Keywords: horror thriller obsession supernatural possession wish unrequited love couple absurdism self harm supernatural horror psychological independent film psychological horror cursed object
+
+Movie: A Quiet Place
+Keywords: horror drama sci fi pregnancy fireworks deaf post apocalyptic future alien life form child in peril creature alien invasion parenting survival horror alien monster human vs alien sign languages hostile anxious dreary quiet upstate new york psychological horror sci fi horror frightened
+
+Movie: Predator
+Keywords: action sci fi adventure sequel survival outcast alien planet spin off casual team up frustrated vibrant hostile alien wilderness relentless hunt intense creature combat deadly pursuit invisible predator territorial threat unexpected alliances hostile terrain unknown world deadly environment hunter vs hunted stealth pursuit
+
+Movie: Prey
+Keywords: thriller action sci fi hunter native american alien life form alien prequel decapitation bear dog severed foot bear attack comanche human vs alien indigenous peoples severed arm dog hero grand great plains
+
+Movie: Get Out
+Keywords: action thriller based on novel or book drug cartel
+
+Movie: Us
+Keywords: horror mystery mask boardwalk murder psychological thriller fear family vacation home invasion amusement park doppelgänger santa cruz california aggressive 1980s duality ambiguous distressing
+
+Movie: Sinners
+Keywords: horror action thriller chicago illinois capitalism ku klux klan musician immortality vampire cousin surrealism sin alcoholism vampire hunter slayer church twins blunt estranged wife dual role cousin relationship death of daughter blues music aftercreditsstinger klansmen 1990s 1930s salvation assimilation chinese immigrant brother brother relationship southern gothic afro descendants supernatural horror playful train station mississippi frightened
+
+Movie: Train to Busan
+Keywords: action horror thriller halloween zombie train survival horror pandemic aggressive somber busan south korea south korea suspenseful
+
+Movie: 28 Days Later
+Keywords: horror thriller sci fi london england infection outbreak zombie brutality survival horror zombie apocalypse virus aggressive waking from coma baffled post apocalyptic
+
+Movie: World War Z
+Keywords: action horror sci fi philadelphia pennsylvania new jersey based on novel or book dystopia jerusalem end of the world apocalypse zombie epidemic nuclear weapons multiple perspectives zombie apocalypse virus
+
+Movie: The Great Gatsby
+Keywords: drama romance infidelity based on novel or book obsession hope long island new york 1920s voiceover
+
+Movie: Titanic
+Keywords: drama romance ship soulmates shipwreck atlantic ocean evacuation iceberg titanic forbidden love ocean liner based on true story rich woman poor man tragedy tragic love historical fiction class differences love affair historical event sinking ship rich snob tragic romance disaster movie 1910s
+
+Movie: La La Land
+Keywords: comedy drama romance dancing dance jazz melancholy musical ambition casting coffee shop jazz club traffic jam hollywood los angeles california pianist pier audition valentine s day planetarium aspiring actor movie set sunset one woman show pool party white savior complex griffith observatory bold exuberant romantic comedy
+
+Movie: Baahubali: The Beginning
+Keywords: action drama kingdom medieval india ancient india bilingual
+
+Movie: Baahubali: The Conclusion
+Keywords: action adventure fantasy kingdom bilingual
+
+Movie: Dangal
+Keywords: drama family comedy small town strong woman sports parent child relationship empowerment abusive father feminism wrestling training biography autobiography domestic abuse fighting womanhood endurance woman vs woman fight female empowerment determination strength training overcoming fears father daughter relationship cheerful excited
+
+Movie: Kalki 2898 AD
+Keywords: drama action fantasy sci fi rebellion hero temple dystopia villain desert religious statue futuristic society quest imperialism ancient temple indian folklore evil empire fantasy indian gods mahabharat
+
+Movie: 3 Idiots
+Keywords: drama comedy challenge middle class slapstick comedy coming of age flashback teacher friends engineering university subjective camera smart kid poor kid looking for friend plot twist inspirational student life advice amused delhi
+
+Movie: Chennai Express
+Keywords: romance comedy action temple language barrier romcom elopement rameshwaram domineering father funeral ceremony fake couple train ride confectionery
+
+Movie: War
+Keywords: action sci fi thriller struggle for survival military training hostile afghanistan veteran alien hunters alien arrival military sci fi u s army ranger extraterrestrial threat special forces training firefights hostile encounter high‑intensity conflict gore elements veteran soldier remote outpost
+
+Movie: Dhurandhar
+Keywords: action crime thriller espionage political party politics asia patriotism nationalism controversy gore pakistan torture terrorism india terrorist attack gun violence bloodshed political corruption grim 1990s spy thriller punjabi indian 2000s international espionage thriller hindi film action chase scene indian film
+
+Movie: Dhurandhar The Revenge
+Keywords: action crime thriller undercover espionage politics spy traitor patriotism nationalism gore gang leader pakistan sequel betrayal conspiracy torture soldier india interrogation terrorist attack undercover operation gun violence bloodshed political corruption
+
