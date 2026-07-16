@@ -28,16 +28,11 @@ supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 # --- SECURE JWT TOKEN VERIFICATION DEPENDENCY ---
 def get_current_user_id(authorization: str = Header(None)) -> str:
-    """
-    Intercepts frontend incoming request headers, passes the Bearer Token to Supabase 
-    to verify authentication, and returns the unique secure user UID.
-    """
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Secure session token missing or malformed.")
     
     token = authorization.split(" ")[1]
     try:
-        # Ask Supabase directly if this specific access token is active and valid
         user_response = supabase.auth.get_user(token)
         if not user_response or not user_response.user:
             raise HTTPException(status_code=401, detail="Invalid or expired access token session.")
@@ -45,18 +40,13 @@ def get_current_user_id(authorization: str = Header(None)) -> str:
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Authentication gateway rejected session: {str(e)}")
 
-# --- PAGINATED DATABASE FETCHER (OPTIMIZED FOR 10K+ ENTRIES) ---
+# --- PAGINATED DATABASE FETCHER ---
 def get_all_movies_from_db() -> tuple:
-    """
-    Fetches the complete movie library dynamically from Supabase 'movies',
-    handling database pagination bounds to retrieve all 10k+ records safely.
-    """
     try:
         all_data = []
         limit = 1000
         offset = 0
         
-        # Paginated retrieval cursor loop
         while True:
             response = (
                 supabase.table("movies")
@@ -89,19 +79,16 @@ class RecommendRequest(BaseModel):
 
 @app.get("/api/movies")
 def get_movies():
-    """Returns the full master list of movie titles to the client."""
     master_movies, _ = get_all_movies_from_db()
     return {"movies": master_movies}
 
 @app.post("/api/watch")
 def watch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user_id)):
-    """Logs a private watch record, retaining original username capitalization."""
     movie_title = body.movie.strip()
 
     master_movies, _ = get_all_movies_from_db()
     matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
 
-    # 🚀 RAW: Safely grab username without changing it to lowercase
     try:
         profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
         if profile_res.data and len(profile_res.data) > 0:
@@ -112,10 +99,9 @@ def watch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user
         username = "user"
 
     try:
-        # Upsert using the secure user_id
         supabase.table("user_watches").upsert({
             "user_id": user_id,
-            "username": username, # Raw username
+            "username": username,
             "movie": matched_title
         }, on_conflict="user_id,movie").execute()
     except Exception as e:
@@ -125,14 +111,12 @@ def watch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user
 
 @app.post("/api/unwatch")
 def unwatch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user_id)):
-    """Removes a private watch record belonging to the authenticated user."""
     movie_title = body.movie.strip()
 
     master_movies, _ = get_all_movies_from_db()
     matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
 
     try:
-        # Delete strictly using the secure user_id mapping
         supabase.table("user_watches").delete().eq("user_id", user_id).eq("movie", matched_title).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database failed removing watch record: {e}")
@@ -141,23 +125,16 @@ def unwatch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_us
 
 @app.get("/api/user-history")
 def get_user_history(user_id: str = Depends(get_current_user_id)):
-    """Generates personalized ML recommendations utilizing the full 10k database catalog."""
-    
-    # 1. Resolve username string from profiles (preserving raw capitalization)
     profile_res = supabase.table("profiles").select("username").eq("id", user_id).single().execute()
     username = profile_res.data.get("username", "Profile User") if profile_res.data else "Profile User"
 
-    # 🔑 CRITICAL: Fetch ALL 10,000+ movies from the master production table
     master_movies, movie_descriptions = get_all_movies_from_db()
     if not master_movies:
         return {"name": username, "unwatched": [], "personalized_recommendations": []}
 
-    # 2. Extract watch states secured under the user's private UID
     watched_set = set()
     try:
         response = supabase.table("user_watches").select("movie").eq("user_id", user_id).execute()
-        
-        # Standardize matching to catch minor string format differences
         db_watched_titles = [row["movie"].strip().lower() for row in (response.data or [])]
         
         for m in master_movies:
@@ -166,11 +143,8 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
     except Exception as e:
         print(f"⚠️ Supabase user watch extraction failure: {e}")
 
-    # 3. Build the unwatched list from the full 10k catalog
-    # Anything not explicitly in the user's watch history is treated as unwatched!
     unwatched_list = [m for m in master_movies if m not in watched_set]
     
-    # 4. Generate ML Content Similarity recommendation vectors
     personalized_recs = []
     if watched_set and unwatched_list:
         all_active_movies = list(watched_set) + unwatched_list
@@ -193,22 +167,21 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                 reverse=True
             )
 
-            # Return top matching titles from the database
-            for movie_name, score in scored_unwatched[:5]:
+            # 🚀 UPDATED: Fetch up to 100 recommendations so the user can continuously load 5 more
+            for movie_name, score in scored_unwatched[:100]:
                 personalized_recs.append({
                     "movie": movie_name,
                     "score": round(float(score), 4)
                 })
 
     return {
-        "name": username, # Raw username to frontend
+        "name": username,
         "unwatched": unwatched_list,
         "personalized_recommendations": personalized_recs
     }
 
 @app.post("/api/recommend")
 def get_recommendations(body: RecommendRequest):
-    """Blends an arbitrary collection of movies to return similarities (Open non-authed utility)."""
     input_titles = body.movies
     if not input_titles:
         raise HTTPException(status_code=400, detail="No reference target titles selected.")
@@ -235,6 +208,8 @@ def get_recommendations(body: RecommendRequest):
     sim_scores = cosine_similarity(blended_input_vector, tfidf_matrix)[0]
     
     scored = sorted(zip(master_movies, sim_scores), key=lambda x: x[1], reverse=True)
-    filtered = [item for item in scored if item[0] not in matched_titles][:3]
+    
+    # 🚀 UPDATED: Fetch up to 50 similar movies to allow deep endless incremental expansion
+    filtered = [item for item in scored if item[0] not in matched_titles][:50]
     
     return {"recommendations": [{"movie": m, "score": float(s)} for m, s in filtered]}

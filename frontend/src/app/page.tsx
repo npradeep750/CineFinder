@@ -40,6 +40,10 @@ export default function MovieRecommender() {
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState<boolean>(false);
 
+  // 🚀 EXPANSION NUMERIC LIMIT STATES (Supports clicking "Show More" over and over!)
+  const [visiblePersonalizedCount, setVisiblePersonalizedCount] = useState<number>(5);
+  const [visibleComboCount, setVisibleComboCount] = useState<number>(5);
+
   const [userData, setUserData] = useState<UserHistory | null>(null);
   
   // Active navigation states (Added 'settings' tab option)
@@ -84,14 +88,20 @@ export default function MovieRecommender() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // 3. Whenever user logs in or out, automatically fetch/clear metrics
-  useEffect(() => {
-    if (session?.access_token) {
-      fetchLatestUserHistory(session.access_token);
-    } else {
-      setUserData(null);
-      setRecommendations([]);
-    }
+  // 3. Whenever user logs in, logs out, or switches accounts, reset session-specific states
+useEffect(() => {
+  // Clear any existing search recommendations and selections immediately upon session changes
+  setRecommendations([]);
+  setSelectedMoviesList([]);
+  setComboDropdownSearch('');
+  setIsComboDropdownOpen(false);
+  setError('');
+
+  if (session?.access_token) {
+    fetchLatestUserHistory(session.access_token);
+  } else {
+    setUserData(null);
+  }
   }, [session]);
 
   const fetchLatestUserHistory = async (token: string) => {
@@ -112,7 +122,7 @@ export default function MovieRecommender() {
     }
   };
 
-  // 4. Secure Authentication form Handler (Dual-Login)
+  // 4. Secure Authentication Form Handler (Supports Dual Login)
   const handleAuthSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -200,7 +210,7 @@ export default function MovieRecommender() {
     }
   };
 
-  // 5. Account settings update handler (Updates profiles & user_watches tables)
+  // 5. Account Settings Update Handler (Updates profiles & user_watches tables)
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdateMessage('');
@@ -241,7 +251,7 @@ export default function MovieRecommender() {
 
         setUpdateMessage('Username updated successfully! ');
         setNewUsername('');
-        // Refresh the backend-held state to show the updated name on welcome header
+        // Refresh display name on welcome banner
         fetchLatestUserHistory(session.access_token);
       }
 
@@ -271,7 +281,7 @@ export default function MovieRecommender() {
     await supabase.auth.signOut();
   };
 
-  // 6. SNAPPY OPTIMISTIC WATCHLIST ACTIONS (SECURED VIA JWT TOKENS)
+  // Snappy optimistic watchlist updates
   const handleToggleMovieWatch = async (movieTitle: string, isCurrentlyWatched: boolean) => {
     if (!userData || !session?.access_token) return;
 
@@ -338,6 +348,8 @@ export default function MovieRecommender() {
     if (selectedMoviesList.length === 0) return;
     setLoading(true);
     setError('');
+    // 🚀 Reset visible count to start back at 3 for a new query
+    setVisibleComboCount(5);
 
     try {
       const response = await fetch(`${API_URL}/recommend`, {
@@ -370,6 +382,13 @@ export default function MovieRecommender() {
   const filteredComboMovies = movies.filter(movie =>
     movie.toLowerCase().includes(comboDropdownSearch.toLowerCase())
   );
+
+  // 🚀 Slice the lists using the new numeric count states
+  const displayedPersonalizedList = userData?.personalized_recommendations 
+    ? userData.personalized_recommendations.slice(0, visiblePersonalizedCount)
+    : [];
+
+  const displayedComboList = recommendations.slice(0, visibleComboCount);
 
   return (
     <div className="min-h-screen bg-slate-950 py-12 px-4 sm:px-6 lg:px-8 font-sans flex flex-col justify-center items-center">
@@ -564,8 +583,9 @@ export default function MovieRecommender() {
                       Based on your live profile tracking history vectors:
                     </p>
                     
+                    {/* Displayed List Sliced Dynamically */}
                     <div className="space-y-3">
-                      {userData.personalized_recommendations.map((item) => (
+                      {displayedPersonalizedList.map((item) => (
                         <div key={item.movie} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
                           <span className="font-semibold text-slate-200">🎬 {item.movie}</span>
                           <span className="text-xs font-bold px-2.5 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-900">
@@ -574,6 +594,26 @@ export default function MovieRecommender() {
                         </div>
                       ))}
                     </div>
+
+                    {/* 🚀 PAGINATION BUTTON: Keep adding 5 more movies on every press */}
+                    {userData.personalized_recommendations.length > visiblePersonalizedCount && (
+                      <div className="mt-4 flex gap-2 justify-center">
+                        <button
+                          onClick={() => setVisiblePersonalizedCount((prev) => prev + 5)}
+                          className="text-xs font-bold text-rose-400 hover:text-rose-300 transition-colors border border-rose-900/50 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-900"
+                        >
+                          ▼ Show 5 More Related Films
+                        </button>
+                        {visiblePersonalizedCount > 5 && (
+                          <button
+                            onClick={() => setVisiblePersonalizedCount(5)}
+                            className="text-xs font-bold text-slate-400 hover:text-slate-300 transition-colors border border-slate-800/50 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-900"
+                          >
+                            ▲ Reset to Top 5
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 text-center text-sm text-slate-400">
@@ -589,7 +629,7 @@ export default function MovieRecommender() {
                 <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 space-y-4">
                   <div>
                     <h2 className="text-md font-bold text-slate-100 mb-1">🧪 Movie Similarity Engine</h2>
-                    <p className="text-xs text-slate-400">Select multiple films by searching the system catalog indexes to generate instant predictions:</p>
+                    <p className="text-xs text-slate-400">Select multiple films by searching the system catalog indexes to generate predictions:</p>
                   </div>
 
                   <div className="relative">
@@ -662,8 +702,10 @@ export default function MovieRecommender() {
                     <h2 className="text-md font-bold text-slate-100 mb-3 pb-2 border-b border-slate-800">
                       Top Results for Selected Movies:
                     </h2>
+                    
+                    {/* Displayed List Sliced Dynamically */}
                     <div className="space-y-2">
-                      {recommendations.map((item) => (
+                      {displayedComboList.map((item) => (
                         <div key={item.movie} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
                           <span className="font-medium text-slate-200">🍿 {item.movie}</span>
                           <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-950 text-rose-300 border border-rose-900">
@@ -672,6 +714,26 @@ export default function MovieRecommender() {
                         </div>
                       ))}
                     </div>
+
+                    {/* 🚀 PAGINATION BUTTON: Keep adding 5 more movies on every press */}
+                    {recommendations.length > visibleComboCount && (
+                      <div className="mt-4 flex gap-2 justify-center">
+                        <button
+                          onClick={() => setVisibleComboCount((prev) => prev + 5)}
+                          className="text-xs font-bold text-rose-400 hover:text-rose-300 transition-colors border border-rose-900/50 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-900"
+                        >
+                          ▼ Show 5 More Related Films
+                        </button>
+                        {visibleComboCount > 3 && (
+                          <button
+                            onClick={() => setVisibleComboCount(3)}
+                            className="text-xs font-bold text-slate-400 hover:text-slate-300 transition-colors border border-slate-800/50 px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-900"
+                          >
+                            ▲ Reset to Top 5
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
