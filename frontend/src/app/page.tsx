@@ -17,6 +17,7 @@ interface UserHistory {
   name: string;
   unwatched: string[]; 
   personalized_recommendations?: Recommendation[]; 
+  ratings?: { [movie: string]: number };
 }
 
 export default function MovieRecommender() {
@@ -40,19 +41,20 @@ export default function MovieRecommender() {
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState<boolean>(false);
 
-  // 🚀 EXPANSION NUMERIC LIMIT STATES (Supports clicking "Show More" over and over!)
+  // 🚀 EXPANSION NUMERIC LIMIT STATES
   const [visiblePersonalizedCount, setVisiblePersonalizedCount] = useState<number>(5);
   const [visibleComboCount, setVisibleComboCount] = useState<number>(5);
 
   const [userData, setUserData] = useState<UserHistory | null>(null);
   
-  // Active navigation states (Added 'settings' tab option)
-  const [activeTab, setActiveTab] = useState<'recommendations' | 'combo' | 'watchlist' | 'settings'>('recommendations');
+  // Active navigation states
+  const [activeTab, setActiveTab] = useState<'recommendations' | 'combo' | 'watchlist' | 'ratings' | 'settings'>('recommendations');
   const [gridSearch, setGridSearch] = useState<string>('');
   
   // Set-based loading states for multi-click snappy optimistic updates
   const [updatingMovies, setUpdatingMovies] = useState<Set<string>>(new Set());
   const [selectedMoviesList, setSelectedMoviesList] = useState<string[]>([]);
+  const [ratingUpdating, setRatingUpdating] = useState<Set<string>>(new Set());
 
   const [comboDropdownSearch, setComboDropdownSearch] = useState<string>('');
   const [isComboDropdownOpen, setIsComboDropdownOpen] = useState<boolean>(false);
@@ -89,19 +91,18 @@ export default function MovieRecommender() {
   }, []);
 
   // 3. Whenever user logs in, logs out, or switches accounts, reset session-specific states
-useEffect(() => {
-  // Clear any existing search recommendations and selections immediately upon session changes
-  setRecommendations([]);
-  setSelectedMoviesList([]);
-  setComboDropdownSearch('');
-  setIsComboDropdownOpen(false);
-  setError('');
+  useEffect(() => {
+    setRecommendations([]);
+    setSelectedMoviesList([]);
+    setComboDropdownSearch('');
+    setIsComboDropdownOpen(false);
+    setError('');
 
-  if (session?.access_token) {
-    fetchLatestUserHistory(session.access_token);
-  } else {
-    setUserData(null);
-  }
+    if (session?.access_token) {
+      fetchLatestUserHistory(session.access_token);
+    } else {
+      setUserData(null);
+    }
   }, [session]);
 
   const fetchLatestUserHistory = async (token: string) => {
@@ -130,14 +131,12 @@ useEffect(() => {
 
     try {
       if (isRegistering) {
-        // --- REGISTRATION ---
         const rawUsername = username.trim();
         if (!rawUsername) {
           throw new Error('Please enter a valid unique username.');
         }
 
-        // Case-insensitive uniqueness check
-        const { data: existingUser, error: checkError } = await supabase
+        const { data: existingUser } = await supabase
           .from('profiles')
           .select('username')
           .ilike('username', rawUsername)
@@ -147,7 +146,6 @@ useEffect(() => {
           throw new Error('This username is already taken. Please choose another one.');
         }
 
-        // Step A: Register with Supabase Auth
         const { data, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
@@ -155,7 +153,6 @@ useEffect(() => {
 
         if (signUpError) throw signUpError;
 
-        // Step B: Insert raw username into profiles table
         if (data.user) {
           const { error: profileError } = await supabase
             .from('profiles')
@@ -172,7 +169,6 @@ useEffect(() => {
         setIsRegistering(false);
         setPassword('');
       } else {
-        // --- LOGIN (Supports either Email or Username) ---
         const typedInput = identifier.trim();
         if (!typedInput) {
           throw new Error('Please enter your email or username.');
@@ -180,7 +176,6 @@ useEffect(() => {
 
         let loginEmail = typedInput.toLowerCase();
 
-        // If the input doesn't look like an email (no '@'), treat it as a username and look up the email
         if (!typedInput.includes('@')) {
           const { data: profile, error: profileError } = await supabase
             .from('profiles')
@@ -195,7 +190,6 @@ useEffect(() => {
           loginEmail = profile.email;
         }
 
-        // Step C: Regular account login using the resolved email
         const { error: signInError } = await supabase.auth.signInWithPassword({
           email: loginEmail,
           password,
@@ -210,7 +204,7 @@ useEffect(() => {
     }
   };
 
-  // 5. Account Settings Update Handler (Updates profiles & user_watches tables)
+  // 5. Account Settings Update Handler
   const handleProfileUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     setUpdateMessage('');
@@ -220,10 +214,8 @@ useEffect(() => {
     try {
       const rawNewUsername = newUsername.trim();
 
-      // A. UPDATE USERNAME (Only executes if the input is not empty!)
       if (rawNewUsername !== '') {
-        // Check if username is already taken by someone else
-        const { data: existingUser, error: checkError } = await supabase
+        const { data: existingUser } = await supabase
           .from('profiles')
           .select('username')
           .ilike('username', rawNewUsername)
@@ -233,7 +225,6 @@ useEffect(() => {
           throw new Error('This username is already taken. Please choose another one.');
         }
 
-        // 1. Update profiles table
         const { error: profileError } = await supabase
           .from('profiles')
           .update({ username: rawNewUsername })
@@ -241,7 +232,6 @@ useEffect(() => {
 
         if (profileError) throw profileError;
 
-        // 2. Update user_watches table logs so older watch entries sync up
         const { error: watchesError } = await supabase
           .from('user_watches')
           .update({ username: rawNewUsername })
@@ -251,11 +241,9 @@ useEffect(() => {
 
         setUpdateMessage('Username updated successfully! ');
         setNewUsername('');
-        // Refresh display name on welcome banner
         fetchLatestUserHistory(session.access_token);
       }
 
-      // B. UPDATE PASSWORD
       if (newPassword) {
         if (newPassword.length < 6) {
           throw new Error('Password must be at least 6 characters long.');
@@ -333,6 +321,50 @@ useEffect(() => {
     }
   };
 
+  const handleRateMovie = async (movieTitle: string, rating: number) => {
+    if (!userData || !session?.access_token) return;
+
+    setRatingUpdating((prev) => {
+      const next = new Set(prev);
+      next.add(movieTitle);
+      return next;
+    });
+
+    const previousRatings = { ...(userData.ratings || {}) };
+    const nextRatings = { ...previousRatings };
+
+    if (rating === 0) {
+      delete nextRatings[movieTitle];
+    } else {
+      nextRatings[movieTitle] = rating;
+    }
+
+    setUserData({ ...userData, ratings: nextRatings });
+
+    try {
+      const response = await fetch(`${API_URL}/rate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ movie: movieTitle, rating }),
+      });
+
+      if (!response.ok) throw new Error('Failed saving rating.');
+      await fetchLatestUserHistory(session.access_token);
+    } catch (err) {
+      setError(`Failed updating rating for "${movieTitle}". Reverting.`);
+      setUserData({ ...userData, ratings: previousRatings });
+    } finally {
+      setRatingUpdating((prev) => {
+        const next = new Set(prev);
+        next.delete(movieTitle);
+        return next;
+      });
+    }
+  };
+
   const handleAddMovieToSelection = (movieTitle: string) => {
     if (!movieTitle || selectedMoviesList.includes(movieTitle)) return;
     setSelectedMoviesList([...selectedMoviesList, movieTitle]);
@@ -348,7 +380,6 @@ useEffect(() => {
     if (selectedMoviesList.length === 0) return;
     setLoading(true);
     setError('');
-    // 🚀 Reset visible count to start back at 3 for a new query
     setVisibleComboCount(5);
 
     try {
@@ -383,7 +414,6 @@ useEffect(() => {
     movie.toLowerCase().includes(comboDropdownSearch.toLowerCase())
   );
 
-  // 🚀 Slice the lists using the new numeric count states
   const displayedPersonalizedList = userData?.personalized_recommendations 
     ? userData.personalized_recommendations.slice(0, visiblePersonalizedCount)
     : [];
@@ -553,6 +583,17 @@ useEffect(() => {
               >
                 📋 Watchlist ({movies.length - (userData?.unwatched?.length || 0)} Watched)
               </button>
+
+              <button
+                onClick={() => setActiveTab('ratings')}
+                className={`py-2.5 px-4 text-sm font-bold border-b-2 transition-all shrink-0 ${
+                  activeTab === 'ratings'
+                    ? 'border-rose-500 text-slate-100'
+                    : 'border-transparent text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                ⭐ Ratings
+              </button>
               <button
                 onClick={() => setActiveTab('settings')}
                 className={`py-2.5 px-4 text-sm font-bold border-b-2 transition-all shrink-0 ${
@@ -571,7 +612,7 @@ useEffect(() => {
               </div>
             )}
 
-            {/* TAB SECTION A: CORE SYSTEM PERSONALIZED RECOMMENDATIONS */}
+            {/* TAB SECTION A: RECOMMENDATIONS */}
             {activeTab === 'recommendations' && (
               <div className="space-y-6">
                 {userData?.personalized_recommendations && userData.personalized_recommendations.length > 0 ? (
@@ -583,7 +624,6 @@ useEffect(() => {
                       Based on your live profile tracking history vectors:
                     </p>
                     
-                    {/* Displayed List Sliced Dynamically */}
                     <div className="space-y-3">
                       {displayedPersonalizedList.map((item) => (
                         <div key={item.movie} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
@@ -595,7 +635,6 @@ useEffect(() => {
                       ))}
                     </div>
 
-                    {/* 🚀 PAGINATION BUTTON: Keep adding 5 more movies on every press */}
                     {userData.personalized_recommendations.length > visiblePersonalizedCount && (
                       <div className="mt-4 flex gap-2 justify-center">
                         <button
@@ -623,7 +662,7 @@ useEffect(() => {
               </div>
             )}
 
-            {/* TAB SECTION B: CUSTOM ARBITRARY COMBO MIXER MODULE */}
+            {/* TAB SECTION B: SIMILAR MOVIES */}
             {activeTab === 'combo' && (
               <div className="space-y-6">
                 <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 space-y-4">
@@ -703,7 +742,6 @@ useEffect(() => {
                       Top Results for Selected Movies:
                     </h2>
                     
-                    {/* Displayed List Sliced Dynamically */}
                     <div className="space-y-2">
                       {displayedComboList.map((item) => (
                         <div key={item.movie} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
@@ -715,7 +753,6 @@ useEffect(() => {
                       ))}
                     </div>
 
-                    {/* 🚀 PAGINATION BUTTON: Keep adding 5 more movies on every press */}
                     {recommendations.length > visibleComboCount && (
                       <div className="mt-4 flex gap-2 justify-center">
                         <button
@@ -739,7 +776,7 @@ useEffect(() => {
               </div>
             )}
 
-            {/* TAB SECTION C: MANAGED OPTIMISTIC WATCHLIST ACTIONS */}
+            {/* TAB SECTION C: WATCHLIST */}
             {activeTab === 'watchlist' && (
               <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 space-y-4">
                 <div>
@@ -792,7 +829,88 @@ useEffect(() => {
               </div>
             )}
 
-            {/* TAB SECTION D: SECURED ACCOUNT PROFILE SETTINGS */}
+            {/* TAB SECTION C2: USER RATINGS */}
+            {activeTab === 'ratings' && (
+              <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 space-y-4">
+                <div>
+                  <h2 className="text-md font-bold text-slate-100 mb-1">⭐ Rate Watched Movies</h2>
+                  <p className="text-xs text-slate-400">
+                    Only movies you've marked as Watched will appear here. Click a star to rate from 1 to 5 stars.
+                  </p>
+                </div>
+
+                <div className="max-h-[420px] overflow-y-auto space-y-2 pr-1">
+                  {movies.filter((m) => checkIsMovieWatched(m)).map((movieName) => {
+                    const currentRating = userData?.ratings ? userData.ratings[movieName] ?? 0 : 0;
+                    const isThisRatingUpdating = ratingUpdating.has(movieName);
+                    const hasRating = currentRating > 0;
+
+                    return (
+                      <div key={movieName} className="flex items-center justify-between p-3 rounded-xl bg-slate-950 border border-slate-800">
+                        <span className="font-semibold text-slate-200 truncate max-w-[50%]">🎬 {movieName}</span>
+
+                        <div className="flex items-center gap-3">
+                          {/* 🌟 5-STAR RATING BUTTONS */}
+                          <div className="flex items-center gap-1">
+                            {[1, 2, 3, 4, 5].map((star) => {
+                              const isFilled = star <= currentRating;
+
+                              return (
+                                <button
+                                  key={star}
+                                  disabled={isThisRatingUpdating}
+                                  onClick={() => handleRateMovie(movieName, star)}
+                                  title={`Rate ${star} star${star > 1 ? 's' : ''}`}
+                                  className="p-0.5 transition-transform hover:scale-125 focus:outline-none disabled:opacity-50"
+                                >
+                                  <svg
+                                    className={`w-5 h-5 ${
+                                      isFilled
+                                        ? 'text-amber-400 fill-amber-400'
+                                        : 'text-slate-600 fill-slate-800 hover:text-amber-300'
+                                    }`}
+                                    viewBox="0 0 24 24"
+                                    stroke="currentColor"
+                                    strokeWidth="1.5"
+                                  >
+                                    <path
+                                      strokeLinecap="round"
+                                      strokeLinejoin="round"
+                                      d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385c.116.488-.42.88-.838.627L12 17.805l-4.743 2.753c-.418.253-.954-.139-.838-.627l1.285-5.385a.563.563 0 00-.182-.557l-4.204-3.602c-.38-.325-.178-.948.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"
+                                    />
+                                  </svg>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* 🗑️ REMOVE RATING BUTTON (Always visible; greyed out if unrated) */}
+                          <button
+                            onClick={() => handleRateMovie(movieName, 0)}
+                            disabled={!hasRating || isThisRatingUpdating}
+                            className={`text-xs transition-colors focus:outline-none ml-1 ${
+                              hasRating
+                                ? 'text-rose-400 hover:text-rose-300 hover:underline font-medium cursor-pointer'
+                                : 'text-slate-600 font-normal cursor-not-allowed pointer-events-none'
+                            }`}
+                          >
+                            Remove rating
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {movies.filter((m) => checkIsMovieWatched(m)).length === 0 && (
+                    <div className="text-xs text-slate-500 text-center py-6">
+                      You haven't marked any movies as Watched yet. Go to Watchlist to mark some films and then rate them here.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* TAB SECTION D: ACCOUNT PROFILE SETTINGS */}
             {activeTab === 'settings' && (
               <div className="bg-slate-900 rounded-2xl shadow-sm border border-slate-800 p-6 space-y-4">
                 <div>

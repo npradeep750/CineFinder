@@ -75,6 +75,10 @@ class WatchMovieRequest(BaseModel):
 class RecommendRequest(BaseModel):
     movies: List[str]
 
+class RatingRequest(BaseModel):
+    movie: str
+    rating: int
+
 # --- PRIVATE SECURED API ENDPOINTS ---
 
 @app.get("/api/movies")
@@ -174,10 +178,21 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                     "score": round(float(score), 4)
                 })
 
+    # --- Attach any stored star ratings for this user ---
+    ratings_map = {}
+    try:
+        ratings_resp = supabase.table("user_ratings").select("movie,rating").eq("user_id", user_id).execute()
+        for r in (ratings_resp.data or []):
+            if r and r.get("movie"):
+                ratings_map[r.get("movie")] = int(r.get("rating"))
+    except Exception as e:
+        print(f"⚠️ Supabase user ratings extraction failure: {e}")
+
     return {
         "name": username,
         "unwatched": unwatched_list,
-        "personalized_recommendations": personalized_recs
+        "personalized_recommendations": personalized_recs,
+        "ratings": ratings_map
     }
 
 @app.post("/api/recommend")
@@ -213,3 +228,55 @@ def get_recommendations(body: RecommendRequest):
     filtered = [item for item in scored if item[0] not in matched_titles][:50]
     
     return {"recommendations": [{"movie": m, "score": float(s)} for m, s in filtered]}
+
+
+# --- USER RATING ENDPOINT - Allows users to set a 1-5 rating on movies they've watched
+# --- USER RATING ENDPOINT - Allows users to set a 1-5 rating or 0 to remove rating
+@app.post("/api/rate")
+def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id)):
+    movie_title = body.movie.strip()
+    rating_value = int(body.rating)
+
+    if rating_value < 0 or rating_value > 5:
+        raise HTTPException(status_code=400, detail="Rating must be an integer between 0 and 5.")
+
+    master_movies, _ = get_all_movies_from_db()
+    matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
+
+    try:
+        # If rating is 0, delete the rating record
+        if rating_value == 0:
+            supabase.table("user_ratings") \
+                .delete() \
+                .eq("user_id", user_id) \
+                .eq("movie", matched_title) \
+                .execute()
+            return {"message": f"Rating removed for '{matched_title}'", "movie": matched_title, "rating": 0}
+
+        # Otherwise insert or update (upsert fallback check)
+        existing = supabase.table("user_ratings") \
+            .select("id") \
+            .eq("user_id", user_id) \
+            .eq("movie", matched_title) \
+            .execute()
+
+        if existing.data and len(existing.data) > 0:
+            supabase.table("user_ratings") \
+                .update({"rating": rating_value}) \
+                .eq("user_id", user_id) \
+                .eq("movie", matched_title) \
+                .execute()
+        else:
+            supabase.table("user_ratings") \
+                .insert({
+                    "user_id": user_id,
+                    "movie": matched_title,
+                    "rating": rating_value
+                }) \
+                .execute()
+
+    except Exception as e:
+        print(f"❌ DB Rating Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database failed updating rating record: {str(e)}")
+
+    return {"message": f"Rating saved for '{matched_title}'", "movie": matched_title, "rating": rating_value}
