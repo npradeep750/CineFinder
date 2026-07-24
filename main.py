@@ -1,8 +1,7 @@
 import os
 from typing import List
 import numpy as np
-import pandas as pd
-from fastapi import FastAPI, Depends, HTTPException, Header
+from fastapi import FastAPI, Depends, HTTPException, Header, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -19,14 +18,26 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# 🔑 SUPABASE PRODUCTION ENGINE CONFIGURATION
 SUPABASE_URL = "https://kxqiovrdimaproigfeyc.supabase.co"
 SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4cWlvdnJkaW1hcHJvaWdmZXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5OTgwNTMsImV4cCI6MjA5OTU3NDA1M30.CMu84XvMMjVLeN_mWtzFbDni-oZGNmrBDRCDJ7L-Clo"
 
-# Base public client initialization
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- SECURE JWT TOKEN VERIFICATION DEPENDENCY ---
+# 🚀 EXPONENTIAL & NEGATIVE RATING WEIGHT MULTIPLIERS
+# Ratings >= 3.0 boost preferences; Ratings < 2.5 penalize/subtract features.
+RATING_WEIGHTS = {
+    5.0: 8.0,    # Heavy positive push towards favorite themes
+    4.5: 4.0,    # Strong positive boost
+    4.0: 2.0,    # Moderate positive boost
+    3.5: 1.2,    # Slight positive boost
+    3.0: 0.8,    # Neutral baseline
+    2.5: 0.0,    # Threshold cutoff
+    2.0: -0.5,   # Mild negative push away
+    1.5: -1.0,   # Moderate negative penalty
+    1.0: -2.0,   # Heavy negative penalty
+    0.5: -4.0,   # Maximum negative penalty
+}
+
 def get_current_user_id(authorization: str = Header(None)) -> str:
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Secure session token missing or malformed.")
@@ -35,12 +46,11 @@ def get_current_user_id(authorization: str = Header(None)) -> str:
     try:
         user_response = supabase.auth.get_user(token)
         if not user_response or not user_response.user:
-            raise HTTPException(status_code=401, detail="Invalid or expired access token session.")
+            raise HTTPException(status_code=401, detail="Invalid session token.")
         return user_response.user.id
     except Exception as e:
-        raise HTTPException(status_code=401, detail=f"Authentication gateway rejected session: {str(e)}")
+        raise HTTPException(status_code=401, detail=f"Authentication error: {str(e)}")
 
-# --- PAGINATED DATABASE FETCHER ---
 def get_all_movies_from_db() -> tuple:
     try:
         all_data = []
@@ -56,19 +66,17 @@ def get_all_movies_from_db() -> tuple:
             )
             batch = response.data or []
             all_data.extend(batch)
-            
             if len(batch) < limit:
                 break
             offset += limit
 
-        master_movies = [row["title"] for row in all_data]
-        movie_descriptions = {row["title"]: row["keywords"] for row in all_data}
+        master_movies = [row["title"] for row in all_data if row.get("title")]
+        movie_descriptions = {row["title"]: (row.get("keywords") or "") for row in all_data if row.get("title")}
         return master_movies, movie_descriptions
     except Exception as e:
-        print(f"❌ Error fetching master lists from cloud tables: {e}")
+        print(f"❌ DB Fetch error: {e}")
         return [], {}
 
-# --- SCHEMAS ---
 class WatchMovieRequest(BaseModel):
     movie: str
 
@@ -77,28 +85,115 @@ class RecommendRequest(BaseModel):
 
 class RatingRequest(BaseModel):
     movie: str
-    rating: int
-
-# --- PRIVATE SECURED API ENDPOINTS ---
+    rating: float
 
 @app.get("/api/movies")
 def get_movies():
     master_movies, _ = get_all_movies_from_db()
     return {"movies": master_movies}
 
+@app.get("/api/user-history")
+def get_user_history(
+    mode: str = Query("ratings", description="Recommendation weighting mode: 'ratings' or 'watches'"),
+    user_id: str = Depends(get_current_user_id)
+):
+    profile_res = supabase.table("profiles").select("username").eq("id", user_id).maybe_single().execute()
+    username = profile_res.data.get("username", "Profile User") if profile_res and profile_res.data else "Profile User"
+
+    master_movies, movie_descriptions = get_all_movies_from_db()
+    if not master_movies:
+        return {"name": username, "unwatched": [], "personalized_recommendations": [], "ratings": {}}
+
+    # 1. Fetch Watched Movies
+    watched_set = set()
+    try:
+        response = supabase.table("user_watches").select("movie").eq("user_id", user_id).execute()
+        db_watched_titles = [row["movie"].strip().lower() for row in (response.data or [])]
+        
+        for m in master_movies:
+            if m.strip().lower() in db_watched_titles:
+                watched_set.add(m)
+    except Exception as e:
+        print(f"⚠️ User watch extraction error: {e}")
+
+    unwatched_list = [m for m in master_movies if m not in watched_set]
+    
+    # 2. Fetch User Ratings
+    ratings_map = {}
+    try:
+        ratings_resp = supabase.table("user_ratings").select("movie,rating").eq("user_id", user_id).execute()
+        for r in (ratings_resp.data or []):
+            if r and r.get("movie"):
+                ratings_map[r.get("movie")] = float(r.get("rating"))
+    except Exception as e:
+        print(f"⚠️ User ratings extraction error: {e}")
+
+    # 3. Calculate Personalized Recommendations
+    personalized_recs = []
+    if watched_set and unwatched_list:
+        watched_list = list(watched_set)
+        all_active_movies = watched_list + unwatched_list
+        descriptions = [movie_descriptions.get(m, "") for m in all_active_movies]
+
+        if any(d.strip() for d in descriptions):
+            tfidf = TfidfVectorizer(stop_words='english')
+            tfidf_matrix = tfidf.fit_transform(descriptions)
+
+            watched_count = len(watched_list)
+            watched_vectors = tfidf_matrix[:watched_count]
+            unwatched_vectors = tfidf_matrix[watched_count:]
+
+            weighted_vectors = []
+            total_weight = 0.0
+
+            for idx, movie in enumerate(watched_list):
+                if mode == "watches":
+                    weight = 1.0
+                else:
+                    if movie in ratings_map:
+                        rating = ratings_map[movie]
+                        weight = RATING_WEIGHTS.get(rating, 0.0)
+                    else:
+                        weight = 0.0  # Unrated movies ignored in star rating mode
+
+                if weight != 0.0:
+                    weighted_movie_vec = watched_vectors[idx].toarray() * weight
+                    weighted_vectors.append(weighted_movie_vec)
+                    total_weight += abs(weight)
+
+            if weighted_vectors and total_weight > 0:
+                user_profile_vector = np.sum(weighted_vectors, axis=0) / total_weight
+                similarity_scores = cosine_similarity(user_profile_vector, unwatched_vectors)[0]
+
+                scored_unwatched = sorted(
+                    zip(unwatched_list, similarity_scores),
+                    key=lambda x: x[1],
+                    reverse=True
+                )
+
+                for movie_name, score in scored_unwatched[:100]:
+                    personalized_recs.append({
+                        "movie": movie_name,
+                        "score": round(float(score), 4)
+                    })
+
+    return {
+        "name": username,
+        "unwatched": unwatched_list,
+        "personalized_recommendations": personalized_recs,
+        "ratings": ratings_map,
+        "mode": mode
+    }
+
 @app.post("/api/watch")
 def watch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user_id)):
     movie_title = body.movie.strip()
-
     master_movies, _ = get_all_movies_from_db()
     matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
 
     try:
         profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
-        if profile_res.data and len(profile_res.data) > 0:
-            username = profile_res.data[0]["username"].strip()
-        else:
-            username = "user"
+        username = profile_res.data[0].get("username", "user").strip() if profile_res.data else "user"
     except Exception:
         username = "user"
 
@@ -111,110 +206,68 @@ def watch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database failed logging watch record: {e}")
     
-    return {"message": f"Successfully updated permanent watchlist state for '{matched_title}'"}
+    return {"message": f"Updated watchlist for '{matched_title}'"}
 
 @app.post("/api/unwatch")
 def unwatch_movie(body: WatchMovieRequest, user_id: str = Depends(get_current_user_id)):
     movie_title = body.movie.strip()
-
     master_movies, _ = get_all_movies_from_db()
     matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
 
     try:
         supabase.table("user_watches").delete().eq("user_id", user_id).eq("movie", matched_title).execute()
+        supabase.table("user_ratings").delete().eq("user_id", user_id).eq("movie", matched_title).execute()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Database failed removing watch record: {e}")
         
-    return {"message": f"Successfully removed watchlist log state for '{matched_title}'"}
+    return {"message": f"Removed '{matched_title}'"}
 
-@app.get("/api/user-history")
-def get_user_history(user_id: str = Depends(get_current_user_id)):
-    profile_res = supabase.table("profiles").select("username").eq("id", user_id).single().execute()
-    username = profile_res.data.get("username", "Profile User") if profile_res.data else "Profile User"
+@app.post("/api/rate")
+def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id)):
+    movie_title = body.movie.strip()
+    rating_value = float(body.rating)
 
-    master_movies, movie_descriptions = get_all_movies_from_db()
-    if not master_movies:
-        return {"name": username, "unwatched": [], "personalized_recommendations": []}
+    if rating_value < 0.0 or rating_value > 5.0:
+        raise HTTPException(status_code=400, detail="Rating must be between 0.0 and 5.0.")
 
-    watched_set = set()
+    master_movies, _ = get_all_movies_from_db()
+    matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
+
     try:
-        response = supabase.table("user_watches").select("movie").eq("user_id", user_id).execute()
-        db_watched_titles = [row["movie"].strip().lower() for row in (response.data or [])]
-        
-        for m in master_movies:
-            if m.strip().lower() in db_watched_titles:
-                watched_set.add(m)
+        if rating_value == 0.0:
+            supabase.table("user_ratings").delete().eq("user_id", user_id).eq("movie", matched_title).execute()
+            return {"message": f"Rating removed for '{matched_title}'", "movie": matched_title, "rating": 0.0}
+
+        existing = supabase.table("user_ratings").select("id").eq("user_id", user_id).eq("movie", matched_title).execute()
+
+        if existing.data and len(existing.data) > 0:
+            supabase.table("user_ratings").update({"rating": rating_value}).eq("user_id", user_id).eq("movie", matched_title).execute()
+        else:
+            supabase.table("user_ratings").insert({"user_id": user_id, "movie": matched_title, "rating": rating_value}).execute()
+
     except Exception as e:
-        print(f"⚠️ Supabase user watch extraction failure: {e}")
+        print(f"❌ DB Rating Error: {e}")
+        raise HTTPException(status_code=500, detail=f"Database failed updating rating record: {str(e)}")
 
-    unwatched_list = [m for m in master_movies if m not in watched_set]
-    
-    personalized_recs = []
-    if watched_set and unwatched_list:
-        all_active_movies = list(watched_set) + unwatched_list
-        descriptions = [movie_descriptions[m] for m in all_active_movies if m in movie_descriptions]
-
-        if descriptions:
-            tfidf = TfidfVectorizer(stop_words='english')
-            tfidf_matrix = tfidf.fit_transform(descriptions)
-
-            watched_count = len(watched_set)
-            watched_vectors = tfidf_matrix[:watched_count]
-            unwatched_vectors = tfidf_matrix[watched_count:]
-
-            user_profile_vector = np.asarray(watched_vectors.mean(axis=0))
-            similarity_scores = cosine_similarity(user_profile_vector, unwatched_vectors)[0]
-
-            scored_unwatched = sorted(
-                zip(unwatched_list, similarity_scores),
-                key=lambda x: x[1],
-                reverse=True
-            )
-
-            # 🚀 UPDATED: Fetch up to 100 recommendations so the user can continuously load 5 more
-            for movie_name, score in scored_unwatched[:100]:
-                personalized_recs.append({
-                    "movie": movie_name,
-                    "score": round(float(score), 4)
-                })
-
-    # --- Attach any stored star ratings for this user ---
-    ratings_map = {}
-    try:
-        ratings_resp = supabase.table("user_ratings").select("movie,rating").eq("user_id", user_id).execute()
-        for r in (ratings_resp.data or []):
-            if r and r.get("movie"):
-                ratings_map[r.get("movie")] = int(r.get("rating"))
-    except Exception as e:
-        print(f"⚠️ Supabase user ratings extraction failure: {e}")
-
-    return {
-        "name": username,
-        "unwatched": unwatched_list,
-        "personalized_recommendations": personalized_recs,
-        "ratings": ratings_map
-    }
+    return {"message": f"Rating saved for '{matched_title}'", "movie": matched_title, "rating": rating_value}
 
 @app.post("/api/recommend")
 def get_recommendations(body: RecommendRequest):
     input_titles = body.movies
     if not input_titles:
-        raise HTTPException(status_code=400, detail="No reference target titles selected.")
+        raise HTTPException(status_code=400, detail="No titles selected.")
 
     master_movies, movie_descriptions = get_all_movies_from_db()
     if not master_movies:
-         raise HTTPException(status_code=503, detail="Dynamic movie catalog cache unavailable.")
+        raise HTTPException(status_code=503, detail="Catalog unavailable.")
 
-    matched_titles = []
-    for title in input_titles:
-        matched = next((m for m in master_movies if m.lower() == title.strip().lower()), None)
-        if matched:
-            matched_titles.append(matched)
+    matched_titles = [next((m for m in master_movies if m.lower() == t.strip().lower()), None) for t in input_titles]
+    matched_titles = [m for m in matched_titles if m]
 
     if not matched_titles:
-        raise HTTPException(status_code=404, detail="None of the matched title entries live in systems registry.")
+        raise HTTPException(status_code=404, detail="No matching titles found.")
 
-    all_descriptions = [movie_descriptions[m] for m in master_movies if m in movie_descriptions]
+    all_descriptions = [movie_descriptions.get(m, "") for m in master_movies]
     tfidf = TfidfVectorizer(stop_words='english')
     tfidf_matrix = tfidf.fit_transform(all_descriptions)
     
@@ -223,60 +276,6 @@ def get_recommendations(body: RecommendRequest):
     sim_scores = cosine_similarity(blended_input_vector, tfidf_matrix)[0]
     
     scored = sorted(zip(master_movies, sim_scores), key=lambda x: x[1], reverse=True)
-    
-    # 🚀 UPDATED: Fetch up to 50 similar movies to allow deep endless incremental expansion
     filtered = [item for item in scored if item[0] not in matched_titles][:50]
     
     return {"recommendations": [{"movie": m, "score": float(s)} for m, s in filtered]}
-
-
-# --- USER RATING ENDPOINT - Allows users to set a 1-5 rating on movies they've watched
-# --- USER RATING ENDPOINT - Allows users to set a 1-5 rating or 0 to remove rating
-@app.post("/api/rate")
-def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id)):
-    movie_title = body.movie.strip()
-    rating_value = int(body.rating)
-
-    if rating_value < 0 or rating_value > 5:
-        raise HTTPException(status_code=400, detail="Rating must be an integer between 0 and 5.")
-
-    master_movies, _ = get_all_movies_from_db()
-    matched_title = next((m for m in master_movies if m.lower() == movie_title.lower()), movie_title)
-
-    try:
-        # If rating is 0, delete the rating record
-        if rating_value == 0:
-            supabase.table("user_ratings") \
-                .delete() \
-                .eq("user_id", user_id) \
-                .eq("movie", matched_title) \
-                .execute()
-            return {"message": f"Rating removed for '{matched_title}'", "movie": matched_title, "rating": 0}
-
-        # Otherwise insert or update (upsert fallback check)
-        existing = supabase.table("user_ratings") \
-            .select("id") \
-            .eq("user_id", user_id) \
-            .eq("movie", matched_title) \
-            .execute()
-
-        if existing.data and len(existing.data) > 0:
-            supabase.table("user_ratings") \
-                .update({"rating": rating_value}) \
-                .eq("user_id", user_id) \
-                .eq("movie", matched_title) \
-                .execute()
-        else:
-            supabase.table("user_ratings") \
-                .insert({
-                    "user_id": user_id,
-                    "movie": matched_title,
-                    "rating": rating_value
-                }) \
-                .execute()
-
-    except Exception as e:
-        print(f"❌ DB Rating Error: {e}")
-        raise HTTPException(status_code=500, detail=f"Database failed updating rating record: {str(e)}")
-
-    return {"message": f"Rating saved for '{matched_title}'", "movie": matched_title, "rating": rating_value}
