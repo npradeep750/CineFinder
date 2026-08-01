@@ -7,72 +7,84 @@ const supabaseUrl = "https://kxqiovrdimaproigfeyc.supabase.co";
 const supabaseAnonKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4cWlvdnJkaW1hcHJvaWdmZXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5OTgwNTMsImV4cCI6MjA5OTU3NDA1M30.CMu84XvMMjVLeN_mWtzFbDni-oZGNmrBDRCDJ7L-Clo";
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-interface Recommendation {
-  movie: string;
-  score: number;
+const TMDB_CDN_BASE = "https://image.tmdb.org/t/p/w500";
+
+interface Movie {
+  tmdb_id: number;
+  title: string;
+  poster_path?: string;
+  score?: number;
+}
+
+interface RatingItem {
+  tmdb_id: number;
+  title: string;
+  poster_path?: string;
+  rating: number;
 }
 
 interface UserHistory {
   name: string;
-  unwatched: string[]; 
-  personalized_recommendations?: Recommendation[]; 
-  ratings?: { [movie: string]: number };
+  personalized_recommendations?: Movie[]; 
+  ratings?: RatingItem[];
 }
 
 function MovieRatingRow({
-  movieName,
-  savedRating,
+  item,
   onRate,
+  onUnwatch,
   isUpdating
 }: {
-  movieName: string;
-  savedRating: number;
+  item: RatingItem;
   onRate: (rating: number) => void;
+  onUnwatch: () => void;
   isUpdating: boolean;
 }) {
   const [hoverValue, setHoverValue] = useState<number | null>(null);
-  const effectiveRating = hoverValue !== null ? hoverValue : savedRating;
-  const hasRating = savedRating > 0;
+  const effectiveRating = hoverValue !== null ? hoverValue : item.rating;
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 gap-3 rounded-xl bg-slate-950 border border-slate-800 transition-colors">
-      <span title={movieName} className="font-semibold text-slate-200 leading-snug break-words flex-1 pr-2">
-        🎬 {movieName}
-      </span>
+      <div className="flex items-center gap-3 flex-1 min-w-0">
+        {item.poster_path ? (
+          <img 
+            src={`${TMDB_CDN_BASE}${item.poster_path}`} 
+            alt={item.title} 
+            className="w-10 h-14 object-cover rounded-md bg-slate-800 shrink-0" 
+          />
+        ) : (
+          <div className="w-10 h-14 bg-slate-800 rounded-md flex items-center justify-center text-xs shrink-0">🎬</div>
+        )}
+        <span title={item.title} className="font-semibold text-slate-200 leading-snug truncate">
+          {item.title}
+        </span>
+      </div>
 
       <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
         <span className="text-xs font-bold text-amber-400 w-8 text-right">
           {effectiveRating > 0 ? `${effectiveRating}★` : '—'}
         </span>
 
-        <div
-          className="flex items-center gap-1"
-          onMouseLeave={() => setHoverValue(null)}
-        >
+        <div className="flex items-center gap-1" onMouseLeave={() => setHoverValue(null)}>
           {[1, 2, 3, 4, 5].map((starIndex) => {
             const fillAmount = Math.max(0, Math.min(1, effectiveRating - (starIndex - 1)));
-
             return (
               <div key={starIndex} className="relative w-5 h-5 cursor-pointer">
                 <button
                   disabled={isUpdating}
                   onClick={() => onRate(starIndex - 0.5)}
                   onMouseEnter={() => setHoverValue(starIndex - 0.5)}
-                  title={`Rate ${starIndex - 0.5} stars`}
                   className="absolute left-0 top-0 w-1/2 h-full z-10 focus:outline-none"
                 />
                 <button
                   disabled={isUpdating}
                   onClick={() => onRate(starIndex)}
                   onMouseEnter={() => setHoverValue(starIndex)}
-                  title={`Rate ${starIndex} stars`}
                   className="absolute right-0 top-0 w-1/2 h-full z-10 focus:outline-none"
                 />
-
                 <svg className="w-5 h-5 text-slate-700 fill-slate-800" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385c.116.488-.42.88-.838.627L12 17.805l-4.743 2.753c-.418.253-.954-.139-.838-.627l1.285-5.385a.563.563 0 00-.182-.557l-4.204-3.602c-.38-.325-.178-.948.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
                 </svg>
-
                 <div className="absolute inset-0 overflow-hidden pointer-events-none" style={{ width: `${fillAmount * 100}%` }}>
                   <svg className={`w-5 h-5 ${hoverValue !== null ? 'text-amber-300 fill-amber-300' : 'text-amber-400 fill-amber-400'}`} viewBox="0 0 24 24">
                     <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385c.116.488-.42.88-.838.627L12 17.805l-4.743 2.753c-.418.253-.954-.139-.838-.627l1.285-5.385a.563.563 0 00-.182-.557l-4.204-3.602c-.38-.325-.178-.948.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
@@ -84,11 +96,11 @@ function MovieRatingRow({
         </div>
 
         <button
-          onClick={() => onRate(0)}
-          disabled={!hasRating || isUpdating}
-          className={`text-xs ml-1 ${hasRating ? 'text-rose-400 hover:underline cursor-pointer' : 'text-slate-600 cursor-not-allowed'}`}
+          onClick={onUnwatch}
+          disabled={isUpdating}
+          className="text-xs text-rose-400 hover:underline cursor-pointer ml-2"
         >
-          Remove rating
+          Remove Watch
         </button>
       </div>
     </div>
@@ -96,8 +108,7 @@ function MovieRatingRow({
 }
 
 export default function MovieRecommender() {
-  const [movies, setMovies] = useState<string[]>([]);
-  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [recommendations, setRecommendations] = useState<Movie[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string>('');
 
@@ -114,24 +125,18 @@ export default function MovieRecommender() {
   const [updateMessage, setUpdateMessage] = useState<string>('');
   const [updateLoading, setUpdateLoading] = useState<boolean>(false);
 
-  const [visiblePersonalizedCount, setVisiblePersonalizedCount] = useState<number>(5);
-  const [visibleComboCount, setVisibleComboCount] = useState<number>(5);
-
   const [userData, setUserData] = useState<UserHistory | null>(null);
-  const [recommendationMode, setRecommendationMode] = useState<'ratings' | 'watches'>('ratings');
-  const [activeTab, setActiveTab] = useState<'recommendations' | 'combo' | 'watchlist' | 'ratings' | 'settings'>('recommendations');
+  const [activeTab, setActiveTab] = useState<'recommendations' | 'combo' | 'ratings' | 'settings'>('recommendations');
   
-  const [gridSearch, setGridSearch] = useState<string>('');
-  const [updatingMovies, setUpdatingMovies] = useState<Set<string>>(new Set());
-  const [selectedMoviesList, setSelectedMoviesList] = useState<string[]>([]);
-  const [ratingUpdating, setRatingUpdating] = useState<Set<string>>(new Set());
+  const [updatingMovies, setUpdatingMovies] = useState<Set<number>>(new Set());
+  const [selectedMoviesList, setSelectedMoviesList] = useState<Movie[]>([]);
 
-  // Search Bar States for Mix & Match
-  const [comboDropdownSearch, setComboDropdownSearch] = useState<string>('');
+  const [comboSearch, setComboSearch] = useState<string>('');
+  const [comboSearchResults, setComboSearchResults] = useState<Movie[]>([]);
   const [isComboDropdownOpen, setIsComboDropdownOpen] = useState<boolean>(false);
 
-  // 🚀 Search Bar States for Ratings Tab
   const [ratingsSearch, setRatingsSearch] = useState<string>('');
+  const [ratingsSearchResults, setRatingsSearchResults] = useState<Movie[]>([]);
   const [isRatingsDropdownOpen, setIsRatingsDropdownOpen] = useState<boolean>(false);
 
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
@@ -139,17 +144,10 @@ export default function MovieRecommender() {
   const API_URL = 'http://localhost:8000/api';
 
   useEffect(() => {
-    fetch(`${API_URL}/movies`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.movies) setMovies(data.movies);
-      })
-      .catch((err) => console.error('Failed fetching master movies:', err));
-
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       if (session) {
-        fetchUserData(session.access_token, recommendationMode);
+        fetchUserData(session.access_token);
         fetchRecentSearches(session.access_token);
       }
     });
@@ -157,7 +155,7 @@ export default function MovieRecommender() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session) {
-        fetchUserData(session.access_token, recommendationMode);
+        fetchUserData(session.access_token);
         fetchRecentSearches(session.access_token);
       } else {
         setUserData(null);
@@ -168,9 +166,41 @@ export default function MovieRecommender() {
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchUserData = async (token: string, mode: 'ratings' | 'watches') => {
+  useEffect(() => {
+    if (!comboSearch.trim()) {
+      setComboSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetch(`${API_URL}/search?q=${encodeURIComponent(comboSearch)}`)
+        .then((res) => res.json())
+        .then((data) => setComboSearchResults(data.movies || []))
+        .catch((err) => console.error(err));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [comboSearch]);
+
+  useEffect(() => {
+    if (!ratingsSearch.trim()) {
+      setRatingsSearchResults([]);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      fetch(`${API_URL}/search?q=${encodeURIComponent(ratingsSearch)}`)
+        .then((res) => res.json())
+        .then((data) => setRatingsSearchResults(data.movies || []))
+        .catch((err) => console.error(err));
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [ratingsSearch]);
+
+  const fetchUserData = async (token: string) => {
     try {
-      const res = await fetch(`${API_URL}/user-history?mode=${mode}`, {
+      const res = await fetch(`${API_URL}/user-history`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -238,11 +268,6 @@ export default function MovieRecommender() {
     }
   };
 
-  const handleModeToggle = (newMode: 'ratings' | 'watches') => {
-    setRecommendationMode(newMode);
-    if (session) fetchUserData(session.access_token, newMode);
-  };
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthLoading(true);
@@ -291,7 +316,7 @@ export default function MovieRecommender() {
         await supabase.auth.updateUser({ password: newPassword });
       }
       setUpdateMessage('Profile updated successfully!');
-      if (session) fetchUserData(session.access_token, recommendationMode);
+      if (session) fetchUserData(session.access_token);
     } catch (err: any) {
       setUpdateMessage(err.message || 'Update failed.');
     } finally {
@@ -299,37 +324,93 @@ export default function MovieRecommender() {
     }
   };
 
-  const handleToggleMovieWatch = async (movieName: string, isWatched: boolean) => {
+  const handleAddWatch = async (tmdb_id: number, title: string = '', poster_path: string = '') => {
     if (!session) return;
-    setUpdatingMovies((prev) => new Set(prev).add(movieName));
 
-    const endpoint = isWatched ? '/unwatch' : '/watch';
+    // 🚀 Optimistic UI Update: Instantly add movie to local state so UI updates immediately
+    setUserData((prev) => {
+      if (!prev) return null;
+      const existing = prev.ratings || [];
+      if (existing.some((item) => item.tmdb_id === tmdb_id)) return prev;
+
+      return {
+        ...prev,
+        ratings: [
+          { tmdb_id, title: title || `Movie #${tmdb_id}`, poster_path: poster_path || '', rating: 0 },
+          ...existing,
+        ],
+      };
+    });
+
+    setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
+
     try {
-      const res = await fetch(`${API_URL}${endpoint}`, {
+      const res = await fetch(`${API_URL}/watch`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${session.access_token}`
+          Authorization: `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ movie: movieName })
+        body: JSON.stringify({ tmdb_id, title, poster_path }),
       });
+
       if (res.ok) {
-        await fetchUserData(session.access_token, recommendationMode);
+        await fetchUserData(session.access_token);
       }
     } catch (err) {
       console.error('Watch toggle failed:', err);
     } finally {
       setUpdatingMovies((prev) => {
         const next = new Set(prev);
-        next.delete(movieName);
+        next.delete(tmdb_id);
         return next;
       });
     }
   };
 
-  const handleRateMovie = async (movieName: string, ratingValue: number) => {
+  const handleUnwatch = async (tmdb_id: number) => {
     if (!session) return;
-    setRatingUpdating((prev) => new Set(prev).add(movieName));
+    setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
+
+    try {
+      const res = await fetch(`${API_URL}/unwatch`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ tmdb_id })
+      });
+      if (res.ok) {
+        await fetchUserData(session.access_token);
+      }
+    } catch (err) {
+      console.error('Unwatch failed:', err);
+    } finally {
+      setUpdatingMovies((prev) => {
+        const next = new Set(prev);
+        next.delete(tmdb_id);
+        return next;
+      });
+    }
+  };
+
+  const handleRateMovie = async (tmdb_id: number, ratingValue: number) => {
+    if (!session) return;
+    
+    // Find item in existing list to retain title and poster path
+    const targetMovie = userData?.ratings?.find((r) => r.tmdb_id === tmdb_id);
+
+    // Optimistic UI Update: update state immediately so the star rating changes instantly
+    setUserData((prev) => {
+      if (!prev) return null;
+      const updatedRatings = (prev.ratings || []).map((item) =>
+        item.tmdb_id === tmdb_id ? { ...item, rating: ratingValue } : item
+      );
+      return { ...prev, ratings: updatedRatings };
+    });
+
+    setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
 
     try {
       const res = await fetch(`${API_URL}/rate`, {
@@ -338,17 +419,23 @@ export default function MovieRecommender() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ movie: movieName, rating: ratingValue })
+        body: JSON.stringify({
+          tmdb_id,
+          rating: ratingValue,
+          title: targetMovie?.title || '',
+          poster_path: targetMovie?.poster_path || ''
+        })
       });
+
       if (res.ok) {
-        await fetchUserData(session.access_token, recommendationMode);
+        await fetchUserData(session.access_token);
       }
     } catch (err) {
       console.error('Rating update failed:', err);
     } finally {
-      setRatingUpdating((prev) => {
+      setUpdatingMovies((prev) => {
         const next = new Set(prev);
-        next.delete(movieName);
+        next.delete(tmdb_id);
         return next;
       });
     }
@@ -363,7 +450,7 @@ export default function MovieRecommender() {
       const res = await fetch(`${API_URL}/recommend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ movies: selectedMoviesList })
+        body: JSON.stringify({ tmdb_ids: selectedMoviesList.map((m) => m.tmdb_id) })
       });
       const data = await res.json();
       if (res.ok) setRecommendations(data.recommendations);
@@ -375,49 +462,10 @@ export default function MovieRecommender() {
     }
   };
 
-  const checkIsMovieWatched = (m: string) => {
-    if (!userData || !userData.unwatched) return false;
-    return !userData.unwatched.includes(m);
-  };
-
-  const filteredGridDisplay = movies.filter((m) =>
-    m.toLowerCase().includes(gridSearch.toLowerCase())
+  const ratingMoviesList = Array.from(
+    new Map((userData?.ratings || []).map(item => [item.tmdb_id, item])).values()
   );
-
-  const comboDropdownMatches = comboDropdownSearch.trim() === '' 
-    ? [] 
-    : movies.filter((m) =>
-        m.toLowerCase().includes(comboDropdownSearch.toLowerCase()) && !selectedMoviesList.includes(m)
-      );
-
-  // 🚀 RATINGS SEARCH MATCHES FROM USER'S WATCHLIST
-  // 🚀 Explicitly sort in JS to prevent integer titles (like "21") from jumping to the top
-const ratingMoviesList = userData?.ratings 
-  ? Object.entries(userData.ratings).sort((a, b) => {
-      const scoreA = a[1];
-      const scoreB = b[1];
-
-      // 1. Unrated films (0.0 stars) shot to the very top
-      if (scoreA === 0 && scoreB !== 0) return -1;
-      if (scoreA !== 0 && scoreB === 0) return 1;
-
-      // 2. Rated films sorted highest stars first
-      if (scoreB !== scoreA) return scoreB - scoreA;
-
-      // 3. Alphabetical tie-breaker
-      return a[0].localeCompare(b[0]);
-    })
-  : [];
-  
-  const ratingsDropdownMatches = ratingsSearch.trim() === ''
-    ? []
-    : ratingMoviesList.filter(([movieName]) =>
-        movieName.toLowerCase().includes(ratingsSearch.toLowerCase())
-      );
-
-  const filteredRatingMovies = ratingMoviesList.filter(([movieName]) =>
-    movieName.toLowerCase().includes(ratingsSearch.toLowerCase())
-  );
+  const selectedIds = new Set(selectedMoviesList.map((m) => m.tmdb_id));
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-8">
@@ -426,8 +474,8 @@ const ratingMoviesList = userData?.ratings
         {/* HEADER */}
         <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-6">
           <div>
-            <h1 className="text-2xl font-black text-rose-500 tracking-tight">🎬 CineFinder</h1>
-            <p className="text-xs text-slate-400 mt-1">High-performance catalog recommendations engine</p>
+            <h1 className="text-2xl font-black text-rose-500 tracking-tight">🎬 Movie Recommender</h1>
+            <p className="text-xs text-slate-400 mt-1">TF-IDF Vectorization & Cosine Similarity Engine</p>
           </div>
           {session && (
             <div className="flex items-center gap-3">
@@ -465,13 +513,11 @@ const ratingMoviesList = userData?.ratings
         ) : (
           /* MAIN DASHBOARD */
           <div className="space-y-6">
-            {/* TABS NAVIGATION */}
             <nav className="flex gap-2 bg-slate-900 border border-slate-800 p-2 rounded-2xl overflow-x-auto">
               {[
                 { id: 'recommendations', label: '🎯 Picks' },
                 { id: 'combo', label: '🔀 Mix & Match' },
-                { id: 'watchlist', label: '📚 Watchlist' },
-                { id: 'ratings', label: '⭐ Ratings' },
+                { id: 'ratings', label: '⭐ Watchlist & Ratings' },
                 { id: 'settings', label: '⚙️ Settings' },
               ].map((tab) => (
                 <button
@@ -486,65 +532,60 @@ const ratingMoviesList = userData?.ratings
               ))}
             </nav>
 
-            {/* TAB: PERSONALIZED RECOMMENDATIONS */}
+            {/* TAB: RECOMMENDATIONS (PICKS) */}
             {activeTab === 'recommendations' && (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                  <h2 className="text-md font-bold">Recommended For You</h2>
-                  <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800 self-start sm:self-auto">
-                    <button
-                      onClick={() => handleModeToggle('ratings')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-lg ${recommendationMode === 'ratings' ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
-                    >
-                      By Ratings
-                    </button>
-                    <button
-                      onClick={() => handleModeToggle('watches')}
-                      className={`px-3 py-1 text-xs font-semibold rounded-lg ${recommendationMode === 'watches' ? 'bg-rose-500 text-white' : 'text-slate-400'}`}
-                    >
-                      By Watches
-                    </button>
-                  </div>
-                </div>
+                <h2 className="text-md font-bold">Recommended For You</h2>
 
                 {userData?.personalized_recommendations && userData.personalized_recommendations.length > 0 ? (
                   <div className="space-y-2">
-                    {userData.personalized_recommendations.slice(0, visiblePersonalizedCount).map((rec, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                        <span className="text-sm font-medium">🎬 {rec.movie}</span>
-                        <span className="text-xs font-bold text-emerald-400">{(rec.score * 100).toFixed(0)}% Match</span>
+                    {Array.from(
+                      new Map(userData.personalized_recommendations.map(rec => [rec.tmdb_id, rec])).values()
+                    ).map((rec) => (
+                      <div key={rec.tmdb_id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          {rec.poster_path ? (
+                            <img src={`${TMDB_CDN_BASE}${rec.poster_path}`} alt="" className="w-8 h-12 object-cover rounded-md" />
+                          ) : (
+                            <div className="w-8 h-12 bg-slate-800 rounded-md flex items-center justify-center">🎬</div>
+                          )}
+                          <span className="text-sm font-medium">{rec.title}</span>
+                        </div>
+
+                        {/* 📐 Cosine Similarity percentage display */}
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-emerald-400">
+                            {((rec.score || 0) * 100).toFixed(0)}% Match
+                          </span>
+                          <button
+                            onClick={() => handleAddWatch(rec.tmdb_id, rec.title, rec.poster_path || '')}
+                            className="text-xs font-bold bg-slate-800 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg transition"
+                          >
+                            + Watchlist
+                          </button>
+                        </div>
                       </div>
                     ))}
-                    {visiblePersonalizedCount < userData.personalized_recommendations.length && (
-                      <button
-                        onClick={() => setVisiblePersonalizedCount((prev) => prev + 5)}
-                        className="w-full py-2 bg-slate-950 border border-slate-800 text-xs font-semibold rounded-xl text-slate-400 hover:text-slate-200"
-                      >
-                        Show More
-                      </button>
-                    )}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 py-4">Rate or mark movies as watched to generate custom recommendations!</p>
+                  <p className="text-xs text-slate-500 py-4">Rate movies on your Watchlist to calculate TF-IDF & Cosine Similarity picks!</p>
                 )}
               </div>
             )}
 
-            {/* TAB: MIX & MATCH WITH RECENT SEARCHES */}
+            {/* TAB: MIX & MATCH */}
             {activeTab === 'combo' && (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
                 <h2 className="text-md font-bold">Combine Movies for Custom Recommendations</h2>
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Type to search movies..."
-                    value={comboDropdownSearch}
+                    placeholder="Type to search TMDB live..."
+                    value={comboSearch}
                     onFocus={() => setIsComboDropdownOpen(true)}
-                    onBlur={() => {
-                      setTimeout(() => setIsComboDropdownOpen(false), 200);
-                    }}
+                    onBlur={() => setTimeout(() => setIsComboDropdownOpen(false), 200)}
                     onChange={(e) => {
-                      setComboDropdownSearch(e.target.value);
+                      setComboSearch(e.target.value);
                       setIsComboDropdownOpen(true);
                     }}
                     className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm"
@@ -552,40 +593,34 @@ const ratingMoviesList = userData?.ratings
 
                   {isComboDropdownOpen && (
                     <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 max-h-56 overflow-y-auto rounded-xl z-20 shadow-2xl">
-                      {/* ACTIVE SEARCH MATCHES */}
-                      {comboDropdownSearch.trim() !== '' && comboDropdownMatches.length > 0 && (
-                        comboDropdownMatches.slice(0, 20).map((m) => (
+                      {comboSearch.trim() !== '' && comboSearchResults.length > 0 && (
+                        comboSearchResults.filter((m) => !selectedIds.has(m.tmdb_id)).map((m) => (
                           <button
-                            key={m}
+                            key={m.tmdb_id}
                             onMouseDown={() => {
                               setSelectedMoviesList((prev) => [...prev, m]);
-                              logRecentSearch(m);
-                              setComboDropdownSearch('');
+                              logRecentSearch(m.title);
+                              setComboSearch('');
                               setIsComboDropdownOpen(false);
                             }}
                             className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-800 text-slate-200 border-b border-slate-800/50 last:border-none flex items-center justify-between"
                           >
-                            <span>🎬 {m}</span>
+                            <span className="flex items-center gap-2">
+                              {m.poster_path && <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt="" className="w-5 h-7 object-cover rounded" />}
+                              {m.title}
+                            </span>
                             <span className="text-[10px] text-slate-500 uppercase font-semibold">Select</span>
                           </button>
                         ))
                       )}
 
-                      {/* NO MATCHES RESULT */}
-                      {comboDropdownSearch.trim() !== '' && comboDropdownMatches.length === 0 && (
-                        <div className="p-4 text-xs text-slate-500 text-center">No movies found matching "{comboDropdownSearch}"</div>
-                      )}
-
-                      {/* 10 MOST RECENT SEARCHES */}
-                      {comboDropdownSearch.trim() === '' && recentSearches.length > 0 && (
+                      {comboSearch.trim() === '' && recentSearches.length > 0 && (
                         <div className="p-2">
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">
-                            🕒 Recent Searches
-                          </div>
+                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">🕒 Recent Searches</div>
                           {recentSearches.map((term, idx) => (
                             <div
                               key={idx}
-                              onMouseDown={() => setComboDropdownSearch(term)}
+                              onMouseDown={() => setComboSearch(term)}
                               className="group w-full text-left px-3 py-2 text-xs hover:bg-slate-800 text-slate-300 rounded-lg flex items-center justify-between cursor-pointer"
                             >
                               <div className="flex items-center gap-2 truncate pr-2">
@@ -594,8 +629,7 @@ const ratingMoviesList = userData?.ratings
                               </div>
                               <button
                                 onMouseDown={(e) => handleDeleteRecentSearch(term, e)}
-                                title="Remove search item"
-                                className="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors"
+                                className="text-slate-500 hover:text-rose-400 p-1 rounded-md"
                               >
                                 ✕
                               </button>
@@ -610,9 +644,9 @@ const ratingMoviesList = userData?.ratings
                 {selectedMoviesList.length > 0 && (
                   <div className="flex flex-wrap gap-2">
                     {selectedMoviesList.map((m) => (
-                      <span key={m} className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2">
-                        {m}
-                        <button onClick={() => setSelectedMoviesList((prev) => prev.filter((i) => i !== m))} className="hover:text-white font-bold">✕</button>
+                      <span key={m.tmdb_id} className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2">
+                        {m.title}
+                        <button onClick={() => setSelectedMoviesList((prev) => prev.filter((i) => i.tmdb_id !== m.tmdb_id))} className="hover:text-white font-bold">✕</button>
                       </span>
                     ))}
                   </div>
@@ -623,15 +657,35 @@ const ratingMoviesList = userData?.ratings
                   disabled={loading || selectedMoviesList.length === 0}
                   className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl py-3 text-sm disabled:opacity-50"
                 >
-                  {loading ? 'Analyzing...' : 'Generate Hybrid Recommendations'}
+                  {loading ? 'Analyzing Vector Similarity...' : 'Generate Cosine Similarity Recommendations'}
                 </button>
 
                 {recommendations.length > 0 && (
                   <div className="space-y-2 mt-4">
-                    {recommendations.slice(0, visibleComboCount).map((rec, idx) => (
-                      <div key={idx} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                        <span className="text-sm font-medium">🎬 {rec.movie}</span>
-                        <span className="text-xs font-bold text-emerald-400">{(rec.score * 100).toFixed(0)}% Similarity</span>
+                    {Array.from(
+                      new Map(recommendations.map(rec => [rec.tmdb_id, rec])).values()
+                    ).map((rec) => (
+                      <div key={rec.tmdb_id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
+                        <div className="flex items-center gap-3">
+                          {rec.poster_path ? (
+                            <img src={`${TMDB_CDN_BASE}${rec.poster_path}`} alt="" className="w-8 h-12 object-cover rounded-md" />
+                          ) : (
+                            <div className="w-8 h-12 bg-slate-800 rounded-md flex items-center justify-center">🎬</div>
+                          )}
+                          <span className="text-sm font-medium">{rec.title}</span>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-bold text-emerald-400">
+                            {((rec.score || 0) * 100).toFixed(0)}% Cosine Similarity
+                          </span>
+                          <button
+                            onClick={() => handleAddWatch(rec.tmdb_id, rec.title, rec.poster_path || '')}
+                            className="text-xs font-bold bg-slate-800 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg transition"
+                          >
+                            + Watchlist
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -639,72 +693,21 @@ const ratingMoviesList = userData?.ratings
               </div>
             )}
 
-            {/* TAB: WATCHLIST */}
-            {activeTab === 'watchlist' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-md font-bold">Movie Catalog Watchlist</h2>
-                  <span className="text-xs text-slate-500">{filteredGridDisplay.length} matched</span>
-                </div>
-                <input
-                  type="text"
-                  placeholder="Filter catalog..."
-                  value={gridSearch}
-                  onChange={(e) => setGridSearch(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm"
-                />
-
-                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                  {filteredGridDisplay.slice(0, 100).map((movieName) => {
-                    const isWatched = checkIsMovieWatched(movieName);
-                    const isUpdating = updatingMovies.has(movieName);
-                    return (
-                      <button
-                        key={movieName}
-                        onClick={() => handleToggleMovieWatch(movieName, isWatched)}
-                        disabled={isUpdating}
-                        className={`w-full flex items-center justify-between p-3 rounded-xl border text-left transition-colors ${
-                          isWatched ? 'bg-rose-500/10 border-rose-500/40 text-rose-200' : 'bg-slate-950 border-slate-800 text-slate-300 hover:border-slate-700'
-                        }`}
-                      >
-                        <span className="text-sm font-semibold truncate max-w-[75%]">
-                          {isWatched ? '✅' : '🎬'} {movieName}
-                        </span>
-                        <span className={`text-[10px] font-bold uppercase px-2 py-1 rounded-md ${
-                          isWatched ? 'bg-rose-500 text-white' : 'bg-slate-800 text-slate-400'
-                        }`}>
-                          {isUpdating ? 'Updating...' : isWatched ? 'Watched' : 'Unwatched'}
-                        </span>
-                      </button>
-                    );
-                  })}
-                  {filteredGridDisplay.length > 100 && (
-                    <p className="text-center text-xs text-slate-500 py-2">
-                      Showing top 100 matches. Refine your search query to view specific titles.
-                    </p>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* 🚀 TAB: RATINGS WITH SEARCH BAR & UNRATED FILMS AT TOP */}
+            {/* TAB: WATCHLIST & RATINGS */}
             {activeTab === 'ratings' && (
               <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
                 <div className="flex justify-between items-center">
-                  <h2 className="text-md font-bold">Your Rated Movies</h2>
-                  <span className="text-xs text-slate-500">{filteredRatingMovies.length} movies</span>
+                  <h2 className="text-md font-bold">Search & Add to Watchlist</h2>
+                  <span className="text-xs text-slate-500">{ratingMoviesList.length} in Watchlist</span>
                 </div>
 
-                {/* RATINGS SEARCH BAR */}
                 <div className="relative">
                   <input
                     type="text"
-                    placeholder="Search watchlist ratings..."
+                    placeholder="Search TMDB to add movies..."
                     value={ratingsSearch}
                     onFocus={() => setIsRatingsDropdownOpen(true)}
-                    onBlur={() => {
-                      setTimeout(() => setIsRatingsDropdownOpen(false), 200);
-                    }}
+                    onBlur={() => setTimeout(() => setIsRatingsDropdownOpen(false), 200)}
                     onChange={(e) => {
                       setRatingsSearch(e.target.value);
                       setIsRatingsDropdownOpen(true);
@@ -713,79 +716,75 @@ const ratingMoviesList = userData?.ratings
                   />
 
                   {isRatingsDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 max-h-56 overflow-y-auto rounded-xl z-20 shadow-2xl">
-                      {/* ACTIVE SEARCH MATCHES */}
-                      {ratingsSearch.trim() !== '' && ratingsDropdownMatches.length > 0 && (
-                        ratingsDropdownMatches.slice(0, 20).map(([movieName]) => (
-                          <button
-                            key={movieName}
-                            onMouseDown={() => {
-                              setRatingsSearch(movieName);
-                              logRecentSearch(movieName);
-                              setIsRatingsDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-800 text-slate-200 border-b border-slate-800/50 last:border-none flex items-center justify-between"
-                          >
-                            <span>🎬 {movieName}</span>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Focus</span>
-                          </button>
-                        ))
-                      )}
+  <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 max-h-56 overflow-y-auto rounded-xl z-20 shadow-2xl">
+    {ratingsSearch.trim() !== '' && ratingsSearchResults.length > 0 && (
+      ratingsSearchResults.map((m) => (
+        <button
+          key={m.tmdb_id}
+          onMouseDown={(e) => {
+            e.preventDefault(); // 👈 Prevents input blur from cancelling the action
+            handleAddWatch(m.tmdb_id, m.title, m.poster_path || '');
+            logRecentSearch(m.title);
+            setRatingsSearch('');
+            setIsRatingsDropdownOpen(false);
+          }}
+          className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-800 text-slate-200 border-b border-slate-800/50 last:border-none flex items-center justify-between cursor-pointer"
+        >
+          <span className="flex items-center gap-2">
+            {m.poster_path && (
+              <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt="" className="w-5 h-7 object-cover rounded" />
+            )}
+            {m.title}
+          </span>
+          <span className="text-[10px] text-rose-400 uppercase font-bold">+ Watchlist</span>
+        </button>
+      ))
+    )}
 
-                      {/* NO MATCHES RESULT */}
-                      {ratingsSearch.trim() !== '' && ratingsDropdownMatches.length === 0 && (
-                        <div className="p-4 text-xs text-slate-500 text-center">No movies found matching "{ratingsSearch}"</div>
-                      )}
-
-                      {/* 10 MOST RECENT SEARCHES */}
-                      {ratingsSearch.trim() === '' && recentSearches.length > 0 && (
-                        <div className="p-2">
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">
-                            🕒 Recent Searches
-                          </div>
-                          {recentSearches.map((term, idx) => (
-                            <div
-                              key={idx}
-                              onMouseDown={() => setRatingsSearch(term)}
-                              className="group w-full text-left px-3 py-2 text-xs hover:bg-slate-800 text-slate-300 rounded-lg flex items-center justify-between cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2 truncate pr-2">
-                                <span className="text-slate-500">🔍</span>
-                                <span className="truncate">{term}</span>
-                              </div>
-                              <button
-                                onMouseDown={(e) => handleDeleteRecentSearch(term, e)}
-                                title="Remove search item"
-                                className="text-slate-500 hover:text-rose-400 p-1 rounded-md transition-colors"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  )}
+    {ratingsSearch.trim() === '' && recentSearches.length > 0 && (
+      <div className="p-2">
+        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">🕒 Recent Searches</div>
+        {recentSearches.map((term, idx) => (
+          <div
+            key={idx}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              setRatingsSearch(term);
+            }}
+            className="group w-full text-left px-3 py-2 text-xs hover:bg-slate-800 text-slate-300 rounded-lg flex items-center justify-between cursor-pointer"
+          >
+            <div className="flex items-center gap-2 truncate pr-2">
+              <span className="text-slate-500">🔍</span>
+              <span className="truncate">{term}</span>
+            </div>
+            <button
+              onMouseDown={(e) => handleDeleteRecentSearch(term, e)}
+              className="text-slate-500 hover:text-rose-400 p-1 rounded-md"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+)}
                 </div>
 
-                {filteredRatingMovies.length > 0 ? (
+                {ratingMoviesList.length > 0 ? (
                   <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                    {filteredRatingMovies.map(([movieName, rating]) => (
+                    {ratingMoviesList.map((item) => (
                       <MovieRatingRow
-                        key={movieName}
-                        movieName={movieName}
-                        savedRating={rating}
-                        onRate={(newRating) => handleRateMovie(movieName, newRating)}
-                        isUpdating={ratingUpdating.has(movieName)}
+                        key={item.tmdb_id}
+                        item={item}
+                        onRate={(newRating) => handleRateMovie(item.tmdb_id, newRating)}
+                        onUnwatch={() => handleUnwatch(item.tmdb_id)}
+                        isUpdating={updatingMovies.has(item.tmdb_id)}
                       />
                     ))}
                   </div>
                 ) : (
-                  <p className="text-xs text-slate-500 py-4">
-                    {ratingsSearch.trim() !== '' 
-                      ? 'No movies match your search term.' 
-                      : 'No watchlist movies available to rate. Add movies to your watchlist first!'}
-                  </p>
+                  <p className="text-xs text-slate-500 py-4">Your watchlist is empty. Use the search bar above to search and add movies!</p>
                 )}
               </div>
             )}

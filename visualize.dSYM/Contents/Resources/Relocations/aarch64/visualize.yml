@@ -1,0 +1,5 @@
+---
+triple:          'arm64-apple-darwin'
+binary-path:     '/Users/naithikpradeep/Desktop/Coding/Personal/movie_recs/visualize'
+relocations:     []
+...
