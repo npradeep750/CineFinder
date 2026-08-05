@@ -1,4 +1,5 @@
 import os
+import json
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 import numpy as np
@@ -29,8 +30,8 @@ CATALOG_CACHE = {
 }
 
 RATING_WEIGHTS = {
-    5.0: 3.0, 4.5: 2.5, 4.0: 2.0, 3.5: 1.5, 3.0: 1.0,
-    2.5: 0.2, 2.0: -0.5, 1.5: -1.0, 1.0: -2.0, 0.5: -3.0,
+    5.0: 8.0, 4.5: 4.0, 4.0: 2.0, 3.5: 1.5, 3.0: 1.0,
+    2.5: 0.5, 2.0: -0.5, 1.5: -1.0, 1.0: -2.0, 0.5: -4.0,
 }
 
 def fetch_movie_keywords(tmdb_id: int) -> str:
@@ -39,8 +40,6 @@ def fetch_movie_keywords(tmdb_id: int) -> str:
     try:
         res = requests.get(url, timeout=3)
         if res.status_code == 200:
-            # Get the 'name' from each keyword object.
-            # Replace spaces so multi-word tags act as single TF-IDF tokens (e.g. "marvelcomic")
             keywords = [k["name"].replace(" ", "") for k in res.json().get("keywords", [])]
             return " ".join(keywords)
     except Exception:
@@ -50,23 +49,30 @@ def fetch_movie_keywords(tmdb_id: int) -> str:
 def load_catalog_and_build_vectors():
     print("🔄 Fetching popular movies from TMDB...")
     all_data = []
+    seen_titles = set()
     
-    # Fetch top ~200 movies
-    for page in range(1, 11):
+    for page in range(1, 51):
         try:
             res = requests.get(f"{TMDB_BASE_URL}/movie/popular?api_key={TMDB_API_KEY}&page={page}", timeout=5)
             if res.status_code == 200:
                 for m in res.json().get("results", []):
+                    title = m["title"]
+                    # 🚀 Normalize title to catch duplicate entries
+                    normalized_title = title.strip().lower()
+                    
+                    if normalized_title in seen_titles:
+                        continue
+                    
+                    seen_titles.add(normalized_title)
                     all_data.append({
                         "tmdb_id": m["id"],
-                        "title": m["title"],
+                        "title": title,
                         "poster_path": m.get("poster_path") or ""
                     })
         except Exception:
             continue
 
     print("🚀 Fetching specific TMDB Keywords for all movies in parallel...")
-    # Fetch keywords concurrently so startup is fast
     with ThreadPoolExecutor(max_workers=15) as executor:
         keyword_results = list(executor.map(fetch_movie_keywords, [m["tmdb_id"] for m in all_data]))
 
@@ -81,7 +87,6 @@ def load_catalog_and_build_vectors():
         poster_path = row["poster_path"]
         keywords_str = keyword_results[idx]
 
-        # 🚀 THE NEW FORMULA: Title repeated 2x + Specific TMDB Keywords repeated 5x
         rich_feature_string = f"{(title.replace(' ', '') + ' ') * 2} {(keywords_str + ' ') * 5}"
 
         movie_obj = {
@@ -104,7 +109,7 @@ def load_catalog_and_build_vectors():
     CATALOG_CACHE["id_to_idx"] = id_to_idx
     CATALOG_CACHE["tfidf_vectorizer"] = tfidf
     CATALOG_CACHE["tfidf_matrix"] = tfidf_matrix
-    print(f"✅ Successfully indexed {len(movies_list)} movies using strict TMDB Keywords!")
+    print(f"✅ Successfully indexed {len(movies_list)} movies.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -186,38 +191,31 @@ def get_recent_searches(user_id: str = Depends(get_current_user_id)):
         .execute()
     )
     raw_searches = [r["query"] for r in (res.data or []) if r.get("query")]
-    
     seen = set()
     unique_searches = []
     for q in raw_searches:
-        if q.lower() not in seen:
-            seen.add(q.lower())
+        if q not in seen:
+            seen.add(q)
             unique_searches.append(q)
             if len(unique_searches) == 10:
                 break
-                
     return {"recent_searches": unique_searches}
 
 @app.post("/api/recent-searches")
 def add_recent_search(body: SearchLogRequest, user_id: str = Depends(get_current_user_id)):
-    query = body.query.strip()
-    if not query:
-        return {"status": "ignored"}
-    
-    supabase.table("user_searches").insert({"user_id": user_id, "query": query}).execute()
-    return {"status": "success"}
+    try:
+        supabase.table("user_searches").insert({"user_id": user_id, "query": body.query}).execute()
+        return {"message": "Logged"}
+    except Exception:
+        return {"message": "Failed to log"}
 
 @app.delete("/api/recent-searches")
 def delete_recent_search(body: SearchDeleteRequest, user_id: str = Depends(get_current_user_id)):
-    query = body.query.strip()
-    if not query:
-        return {"status": "ignored"}
-    
     try:
-        supabase.table("user_searches").delete().eq("user_id", user_id).ilike("query", query).execute()
-        return {"status": "success"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to delete search: {str(e)}")
+        supabase.table("user_searches").delete().eq("user_id", user_id).eq("query", body.query).execute()
+        return {"message": "Deleted"}
+    except Exception:
+        return {"message": "Failed to delete"}
 
 @app.get("/api/user-history")
 def get_user_history(user_id: str = Depends(get_current_user_id)):
@@ -245,7 +243,6 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
         t_id = r.get("tmdb_id")
         if t_id:
             user_ratings[t_id] = float(r["rating"])
-            # If movie was rated but missing in watches map, add it dynamically
             if t_id not in watched_map:
                 watched_map[t_id] = {
                     "tmdb_id": t_id,
@@ -283,7 +280,19 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
         if weighted_vectors:
             user_profile_vec = np.mean(weighted_vectors, axis=0).reshape(1, -1)
             watched_ids = set(watched_map.keys())
-            unwatched_movies = [m for m in movies_list if m["tmdb_id"] not in watched_ids]
+
+            # Gather all titles already in watched/rated list (lowercased)
+            watched_titles = {
+                m_info["title"].strip().lower() 
+                for m_info in watched_map.values() 
+                if m_info.get("title")
+            }
+
+            # Filter unwatched movies by BOTH tmdb_id AND title
+            unwatched_movies = [
+                m for m in movies_list 
+                if m["tmdb_id"] not in watched_ids and m["title"].strip().lower() not in watched_titles
+            ]
             unwatched_indices = [id_to_idx[m["tmdb_id"]] for m in unwatched_movies if m["tmdb_id"] in id_to_idx]
 
             if unwatched_indices:
@@ -291,15 +300,21 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                 sim_scores = cosine_similarity(user_profile_vec, unwatched_matrix)[0]
                 scored = sorted(zip(unwatched_movies, sim_scores), key=lambda x: x[1], reverse=True)
                 
-                personalized_recommendations = [
-                    {
-                        "tmdb_id": m["tmdb_id"],
-                        "title": m["title"],
-                        "poster_path": m.get("poster_path") or "",
-                        "score": round(float(s), 4)
-                    }
-                    for m, s in scored if s > 0.05
-                ][:50]
+                # Prevent duplicate titles within the recommendation results list itself
+                seen_rec_titles = set(watched_titles)
+                
+                for m, s in scored:
+                    title_clean = m["title"].strip().lower()
+                    if s > 0.05 and title_clean not in seen_rec_titles:
+                        seen_rec_titles.add(title_clean)
+                        personalized_recommendations.append({
+                            "tmdb_id": m["tmdb_id"],
+                            "title": m["title"],
+                            "poster_path": m.get("poster_path") or "",
+                            "score": round(float(s), 4)
+                        })
+                        if len(personalized_recommendations) == 50:
+                            break
 
     return {
         "name": username,
@@ -319,23 +334,24 @@ def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id))
             if body.poster_path:
                 payload["poster_path"] = body.poster_path
 
-            # Save to user_ratings
-            supabase.table("user_ratings").upsert(
-                payload,
-                on_conflict="user_id, tmdb_id"
-            ).execute()
+            # 🚀 Check existing rating to prevent 500 error on UPSERT without keys
+            existing_rating = supabase.table("user_ratings").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
+            if existing_rating.data:
+                supabase.table("user_ratings").update(payload).eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
+            else:
+                supabase.table("user_ratings").insert(payload).execute()
 
-            # Ensure movie is also present in user_watches
             watch_payload = {"user_id": user_id, "tmdb_id": body.tmdb_id}
             if body.title:
                 watch_payload["movie"] = body.title
             if body.poster_path:
                 watch_payload["poster_path"] = body.poster_path
 
-            supabase.table("user_watches").upsert(
-                watch_payload,
-                on_conflict="user_id, tmdb_id"
-            ).execute()
+            existing_watch = supabase.table("user_watches").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
+            if existing_watch.data:
+                supabase.table("user_watches").update(watch_payload).eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
+            else:
+                supabase.table("user_watches").insert(watch_payload).execute()
 
         return {"message": "Rating saved.", "tmdb_id": body.tmdb_id}
     except Exception as e:
@@ -350,16 +366,19 @@ def mark_movie_as_watched(body: WatchRequest, user_id: str = Depends(get_current
         if body.poster_path:
             payload["poster_path"] = body.poster_path
 
-        supabase.table("user_watches").upsert(
-            payload,
-            on_conflict="user_id, tmdb_id"
-        ).execute()
+        # 🚀 Check existing watch
+        existing_watch = supabase.table("user_watches").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
+        if existing_watch.data:
+            supabase.table("user_watches").update(payload).eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
+        else:
+            supabase.table("user_watches").insert(payload).execute()
+
         return {"message": "Marked as watched.", "tmdb_id": body.tmdb_id}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Watch insert failed: {str(e)}")
 
 @app.post("/api/unwatch")
-def mark_movie_as_unwatched(body: WatchRequest, user_id: str = Depends(get_current_user_id)):
+def unwatch_movie(body: WatchRequest, user_id: str = Depends(get_current_user_id)):
     try:
         supabase.table("user_watches").delete().eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
         supabase.table("user_ratings").delete().eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
@@ -380,20 +399,32 @@ def get_hybrid_recommendations(body: RecommendRequest):
     if not matched_indices:
         raise HTTPException(status_code=404, detail="Selected movies not found in index.")
 
-    # 📐 Compute Blended Vector and Cosine Similarity
     matched_matrix = tfidf_matrix[matched_indices]
     blended_vector = np.asarray(matched_matrix.mean(axis=0))
     sim_scores = cosine_similarity(blended_vector, tfidf_matrix)[0]
 
     scored = sorted(zip(movies_list, sim_scores), key=lambda x: x[1], reverse=True)
-    results = [
-        {
-            "tmdb_id": m["tmdb_id"],
-            "title": m["title"],
-            "poster_path": m.get("poster_path") or "",
-            "score": round(float(s), 4)
-        }
-        for m, s in scored if m["tmdb_id"] not in body.tmdb_ids
-    ][:20]
+    
+    # Get titles of user-selected input movies
+    selected_titles = {
+        CATALOG_CACHE["id_to_movie"][t_id]["title"].strip().lower()
+        for t_id in body.tmdb_ids if t_id in CATALOG_CACHE["id_to_movie"]
+    }
+    
+    seen_titles = set(selected_titles)
+    results = []
+    
+    for m, s in scored:
+        norm_title = m["title"].strip().lower()
+        if m["tmdb_id"] not in body.tmdb_ids and norm_title not in seen_titles:
+            seen_titles.add(norm_title)
+            results.append({
+                "tmdb_id": m["tmdb_id"],
+                "title": m["title"],
+                "poster_path": m.get("poster_path") or "",
+                "score": round(float(s), 4)
+            })
+            if len(results) == 20:
+                break
 
     return {"recommendations": results}

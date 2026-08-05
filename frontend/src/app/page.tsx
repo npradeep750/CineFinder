@@ -127,6 +127,7 @@ export default function MovieRecommender() {
 
   const [userData, setUserData] = useState<UserHistory | null>(null);
   const [activeTab, setActiveTab] = useState<'recommendations' | 'combo' | 'ratings' | 'settings'>('recommendations');
+  const [focusedWatchlistId, setFocusedWatchlistId] = useState<number | null>(null);
   
   const [updatingMovies, setUpdatingMovies] = useState<Set<number>>(new Set());
   const [selectedMoviesList, setSelectedMoviesList] = useState<Movie[]>([]);
@@ -139,7 +140,7 @@ export default function MovieRecommender() {
   const [ratingsSearchResults, setRatingsSearchResults] = useState<Movie[]>([]);
   const [isRatingsDropdownOpen, setIsRatingsDropdownOpen] = useState<boolean>(false);
 
-  const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [recentSearches, setRecentSearches] = useState<Movie[]>([]);
 
   const API_URL = 'http://localhost:8000/api';
 
@@ -219,19 +220,27 @@ export default function MovieRecommender() {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.recent_searches) setRecentSearches(data.recent_searches);
+        if (data.recent_searches) {
+          const parsedMovies: Movie[] = data.recent_searches
+            .map((str: string) => {
+              try { return JSON.parse(str); } 
+              catch { return null; }
+            })
+            .filter(Boolean);
+          setRecentSearches(parsedMovies);
+        }
       }
     } catch (err) {
       console.error('Failed fetching recent searches:', err);
     }
   };
 
-  const logRecentSearch = async (selectedMovieTitle: string) => {
-    if (!session || !selectedMovieTitle.trim()) return;
+  const logRecentSearch = async (selectedMovie: Movie) => {
+    if (!session || !selectedMovie) return;
 
     setRecentSearches((prev) => {
-      const filtered = prev.filter((item) => item.toLowerCase() !== selectedMovieTitle.toLowerCase());
-      return [selectedMovieTitle.trim(), ...filtered].slice(0, 10);
+      const filtered = prev.filter((item) => item.tmdb_id !== selectedMovie.tmdb_id);
+      return [selectedMovie, ...filtered].slice(0, 10);
     });
 
     try {
@@ -241,18 +250,19 @@ export default function MovieRecommender() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ query: selectedMovieTitle.trim() })
+        body: JSON.stringify({ query: JSON.stringify(selectedMovie) })
       });
     } catch (err) {
       console.error('Failed logging search:', err);
     }
   };
 
-  const handleDeleteRecentSearch = async (termToDelete: string, e: React.MouseEvent) => {
+  const handleDeleteRecentSearch = async (movieToDelete: Movie, e: React.MouseEvent) => {
+    e.preventDefault(); 
     e.stopPropagation();
     if (!session) return;
 
-    setRecentSearches((prev) => prev.filter((item) => item.toLowerCase() !== termToDelete.toLowerCase()));
+    setRecentSearches((prev) => prev.filter((item) => item.tmdb_id !== movieToDelete.tmdb_id));
 
     try {
       await fetch(`${API_URL}/recent-searches`, {
@@ -261,11 +271,27 @@ export default function MovieRecommender() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${session.access_token}`
         },
-        body: JSON.stringify({ query: termToDelete })
+        body: JSON.stringify({ query: JSON.stringify(movieToDelete) })
       });
     } catch (err) {
       console.error('Failed deleting search:', err);
     }
+  };
+
+  const handleMovieSelect = (movie: Movie) => {
+    const existingEntry = userData?.ratings?.find((r) => r.tmdb_id === movie.tmdb_id);
+
+    if (existingEntry) {
+      setActiveTab('ratings');
+      setFocusedWatchlistId(movie.tmdb_id);
+      setRatingsSearch('');
+    } else {
+      handleAddWatch(movie.tmdb_id, movie.title, movie.poster_path);
+    }
+    
+    logRecentSearch(movie);
+    setIsComboDropdownOpen(false);
+    setComboSearch('');
   };
 
   const handleAuth = async (e: React.FormEvent) => {
@@ -326,13 +352,10 @@ export default function MovieRecommender() {
 
   const handleAddWatch = async (tmdb_id: number, title: string = '', poster_path: string = '') => {
     if (!session) return;
-
-    // 🚀 Optimistic UI Update: Instantly add movie to local state so UI updates immediately
     setUserData((prev) => {
       if (!prev) return null;
       const existing = prev.ratings || [];
       if (existing.some((item) => item.tmdb_id === tmdb_id)) return prev;
-
       return {
         ...prev,
         ratings: [
@@ -341,9 +364,7 @@ export default function MovieRecommender() {
         ],
       };
     });
-
     setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
-
     try {
       const res = await fetch(`${API_URL}/watch`, {
         method: 'POST',
@@ -353,7 +374,6 @@ export default function MovieRecommender() {
         },
         body: JSON.stringify({ tmdb_id, title, poster_path }),
       });
-
       if (res.ok) {
         await fetchUserData(session.access_token);
       }
@@ -371,7 +391,6 @@ export default function MovieRecommender() {
   const handleUnwatch = async (tmdb_id: number) => {
     if (!session) return;
     setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
-
     try {
       const res = await fetch(`${API_URL}/unwatch`, {
         method: 'POST',
@@ -397,21 +416,17 @@ export default function MovieRecommender() {
 
   const handleRateMovie = async (tmdb_id: number, ratingValue: number) => {
     if (!session) return;
-    
-    // Find item in existing list to retain title and poster path
     const targetMovie = userData?.ratings?.find((r) => r.tmdb_id === tmdb_id);
-
-    // Optimistic UI Update: update state immediately so the star rating changes instantly
     setUserData((prev) => {
       if (!prev) return null;
-      const updatedRatings = (prev.ratings || []).map((item) =>
-        item.tmdb_id === tmdb_id ? { ...item, rating: ratingValue } : item
-      );
-      return { ...prev, ratings: updatedRatings };
+      return {
+        ...prev,
+        ratings: prev.ratings?.map((r) =>
+          r.tmdb_id === tmdb_id ? { ...r, rating: ratingValue } : r
+        ),
+      };
     });
-
     setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
-
     try {
       const res = await fetch(`${API_URL}/rate`, {
         method: 'POST',
@@ -426,12 +441,11 @@ export default function MovieRecommender() {
           poster_path: targetMovie?.poster_path || ''
         })
       });
-
       if (res.ok) {
         await fetchUserData(session.access_token);
       }
     } catch (err) {
-      console.error('Rating update failed:', err);
+      console.error('Rating failed:', err);
     } finally {
       setUpdatingMovies((prev) => {
         const next = new Set(prev);
@@ -441,379 +455,354 @@ export default function MovieRecommender() {
     }
   };
 
-  const handleComboRecommend = async () => {
+  const getRecommendations = async () => {
     if (selectedMoviesList.length === 0) return;
     setLoading(true);
     setError('');
-
     try {
       const res = await fetch(`${API_URL}/recommend`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tmdb_ids: selectedMoviesList.map((m) => m.tmdb_id) })
+        body: JSON.stringify({ tmdb_ids: selectedMoviesList.map(m => m.tmdb_id) }),
       });
+      if (!res.ok) throw new Error('Recommendation failed');
       const data = await res.json();
-      if (res.ok) setRecommendations(data.recommendations);
-      else setError(data.detail || 'Recommendation calculation failed.');
-    } catch (err) {
-      setError('Server request failed.');
+      setRecommendations(data.recommendations || []);
+    } catch (err: any) {
+      setError(err.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const ratingMoviesList = Array.from(
-    new Map((userData?.ratings || []).map(item => [item.tmdb_id, item])).values()
-  );
-  const selectedIds = new Set(selectedMoviesList.map((m) => m.tmdb_id));
+  if (!session) {
+    return (
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex items-center justify-center p-4 font-sans">
+        <div className="max-w-md w-full bg-slate-900 rounded-2xl shadow-2xl p-8 border border-slate-800">
+          <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-indigo-500 mb-6 text-center">
+            {isRegistering ? 'Create Account' : 'Welcome Back'}
+          </h1>
+          {error && <div className="mb-4 p-3 bg-rose-950/50 text-rose-300 text-sm rounded-xl text-center border border-rose-500/30">{error}</div>}
+          <form onSubmit={handleAuth} className="space-y-4">
+            {isRegistering ? (
+              <>
+                <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+                <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+              </>
+            ) : (
+              <input type="text" placeholder="Username or Email" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+            )}
+            <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+            <button type="submit" disabled={authLoading} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl py-3 px-4 transition-colors disabled:opacity-50">
+              {authLoading ? 'Please wait...' : (isRegistering ? 'Sign Up' : 'Log In')}
+            </button>
+          </form>
+          <button onClick={() => { setIsRegistering(!isRegistering); setError(''); }} className="w-full mt-4 text-slate-400 hover:text-slate-300 text-sm font-medium transition-colors">
+            {isRegistering ? 'Already have an account? Log in' : "Don't have an account? Sign up"}
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans p-4 sm:p-8">
-      <div className="max-w-4xl mx-auto space-y-6">
-        
-        {/* HEADER */}
-        <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-slate-900 border border-slate-800 rounded-2xl p-6">
-          <div>
-            <h1 className="text-2xl font-black text-rose-500 tracking-tight">🎬 Movie Recommender</h1>
-            <p className="text-xs text-slate-400 mt-1">TF-IDF Vectorization & Cosine Similarity Engine</p>
-          </div>
-          {session && (
-            <div className="flex items-center gap-3">
-              <span className="text-sm font-semibold text-slate-300">👋 {userData?.name || 'User'}</span>
-              <button onClick={handleLogout} className="text-xs bg-slate-800 hover:bg-rose-500/20 hover:text-rose-400 px-3 py-2 rounded-xl transition">
-                Logout
-              </button>
-            </div>
-          )}
-        </header>
-
-        {!session ? (
-          /* AUTH FORM */
-          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 max-w-md mx-auto">
-            <h2 className="text-lg font-bold mb-4">{isRegistering ? 'Create Account' : 'Sign In'}</h2>
-            {error && <div className="p-3 mb-4 bg-rose-500/10 text-rose-400 text-xs rounded-xl">{error}</div>}
-            <form onSubmit={handleAuth} className="space-y-4">
-              {isRegistering ? (
-                <>
-                  <input type="text" placeholder="Username" value={username} onChange={(e) => setUsername(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm" />
-                  <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm" />
-                </>
-              ) : (
-                <input type="text" placeholder="Username or Email" value={identifier} onChange={(e) => setIdentifier(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm" />
-              )}
-              <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm" />
-              <button type="submit" disabled={authLoading} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl py-3 text-sm disabled:opacity-50">
-                {authLoading ? 'Authenticating...' : isRegistering ? 'Register' : 'Login'}
-              </button>
-            </form>
-            <button onClick={() => setIsRegistering(!isRegistering)} className="w-full text-center text-xs text-slate-400 mt-4 hover:underline">
-              {isRegistering ? 'Already have an account? Sign in' : 'Need an account? Register'}
+    <div className="min-h-screen bg-slate-950 text-slate-100 font-sans pb-20">
+      <header className="bg-slate-900 border-b border-slate-800 sticky top-0 z-50">
+        <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+          <h1 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-rose-400 to-indigo-500">
+            CineFinder
+          </h1>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium text-slate-400">Hi, {userData?.name || 'User'}</span>
+            <button onClick={handleLogout} className="text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-300 px-3 py-1.5 rounded-full transition-colors">
+              Logout
             </button>
           </div>
-        ) : (
-          /* MAIN DASHBOARD */
-          <div className="space-y-6">
-            <nav className="flex gap-2 bg-slate-900 border border-slate-800 p-2 rounded-2xl overflow-x-auto">
-              {[
-                { id: 'recommendations', label: '🎯 Picks' },
-                { id: 'combo', label: '🔀 Mix & Match' },
-                { id: 'ratings', label: '⭐ Watchlist & Ratings' },
-                { id: 'settings', label: '⚙️ Settings' },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={`px-4 py-2 text-xs font-bold rounded-xl transition shrink-0 ${
-                    activeTab === tab.id ? 'bg-rose-500 text-white' : 'text-slate-400 hover:text-slate-200'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              ))}
-            </nav>
+        </div>
+        <div className="max-w-4xl mx-auto px-4 flex gap-6 overflow-x-auto no-scrollbar">
+          <button onClick={() => setActiveTab('recommendations')} className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'recommendations' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>For You</button>
+          <button onClick={() => setActiveTab('combo')} className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'combo' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>Combo Search</button>
+          <button onClick={() => { setActiveTab('ratings'); setFocusedWatchlistId(null); }} className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'ratings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>Watchlist & Ratings</button>
+          <button onClick={() => setActiveTab('settings')} className={`pb-3 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${activeTab === 'settings' ? 'border-indigo-500 text-indigo-400' : 'border-transparent text-slate-500 hover:text-slate-300'}`}>Settings</button>
+        </div>
+      </header>
 
-            {/* TAB: RECOMMENDATIONS (PICKS) */}
-            {activeTab === 'recommendations' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <h2 className="text-md font-bold">Recommended For You</h2>
-
-                {userData?.personalized_recommendations && userData.personalized_recommendations.length > 0 ? (
-                  <div className="space-y-2">
-                    {Array.from(
-                      new Map(userData.personalized_recommendations.map(rec => [rec.tmdb_id, rec])).values()
-                    ).map((rec) => (
-                      <div key={rec.tmdb_id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                        <div className="flex items-center gap-3">
-                          {rec.poster_path ? (
-                            <img src={`${TMDB_CDN_BASE}${rec.poster_path}`} alt="" className="w-8 h-12 object-cover rounded-md" />
-                          ) : (
-                            <div className="w-8 h-12 bg-slate-800 rounded-md flex items-center justify-center">🎬</div>
-                          )}
-                          <span className="text-sm font-medium">{rec.title}</span>
-                        </div>
-
-                        {/* 📐 Cosine Similarity percentage display */}
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-emerald-400">
-                            {((rec.score || 0) * 100).toFixed(0)}% Match
-                          </span>
-                          <button
-                            onClick={() => handleAddWatch(rec.tmdb_id, rec.title, rec.poster_path || '')}
-                            className="text-xs font-bold bg-slate-800 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg transition"
-                          >
-                            + Watchlist
-                          </button>
-                        </div>
+      <main className="max-w-4xl mx-auto px-4 py-8">
+        {activeTab === 'recommendations' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <h2 className="text-2xl font-bold text-slate-100">Personalized for You</h2>
+            <p className="text-sm text-slate-400">Based on your highly rated movies.</p>
+            {userData?.personalized_recommendations && userData.personalized_recommendations.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {userData.personalized_recommendations.map((m, idx) => (
+                  <div key={idx} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all group relative cursor-pointer" onClick={() => handleAddWatch(m.tmdb_id, m.title, m.poster_path)}>
+                    <div className="aspect-[2/3] bg-slate-800 relative">
+                      {m.poster_path ? (
+                        <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt={m.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-4xl">🎬</div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                      <div className="absolute top-2 right-2 bg-indigo-600/90 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
+                        {(m.score! * 100).toFixed(0)}% Match
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 py-4">Rate movies on your Watchlist to calculate TF-IDF & Cosine Similarity picks!</p>
-                )}
-              </div>
-            )}
-
-            {/* TAB: MIX & MATCH */}
-            {activeTab === 'combo' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <h2 className="text-md font-bold">Combine Movies for Custom Recommendations</h2>
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Type to search TMDB live..."
-                    value={comboSearch}
-                    onFocus={() => setIsComboDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setIsComboDropdownOpen(false), 200)}
-                    onChange={(e) => {
-                      setComboSearch(e.target.value);
-                      setIsComboDropdownOpen(true);
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm"
-                  />
-
-                  {isComboDropdownOpen && (
-                    <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 max-h-56 overflow-y-auto rounded-xl z-20 shadow-2xl">
-                      {comboSearch.trim() !== '' && comboSearchResults.length > 0 && (
-                        comboSearchResults.filter((m) => !selectedIds.has(m.tmdb_id)).map((m) => (
-                          <button
-                            key={m.tmdb_id}
-                            onMouseDown={() => {
-                              setSelectedMoviesList((prev) => [...prev, m]);
-                              logRecentSearch(m.title);
-                              setComboSearch('');
-                              setIsComboDropdownOpen(false);
-                            }}
-                            className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-800 text-slate-200 border-b border-slate-800/50 last:border-none flex items-center justify-between"
-                          >
-                            <span className="flex items-center gap-2">
-                              {m.poster_path && <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt="" className="w-5 h-7 object-cover rounded" />}
-                              {m.title}
-                            </span>
-                            <span className="text-[10px] text-slate-500 uppercase font-semibold">Select</span>
-                          </button>
-                        ))
-                      )}
-
-                      {comboSearch.trim() === '' && recentSearches.length > 0 && (
-                        <div className="p-2">
-                          <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">🕒 Recent Searches</div>
-                          {recentSearches.map((term, idx) => (
-                            <div
-                              key={idx}
-                              onMouseDown={() => setComboSearch(term)}
-                              className="group w-full text-left px-3 py-2 text-xs hover:bg-slate-800 text-slate-300 rounded-lg flex items-center justify-between cursor-pointer"
-                            >
-                              <div className="flex items-center gap-2 truncate pr-2">
-                                <span className="text-slate-500">🔍</span>
-                                <span className="truncate">{term}</span>
-                              </div>
-                              <button
-                                onMouseDown={(e) => handleDeleteRecentSearch(term, e)}
-                                className="text-slate-500 hover:text-rose-400 p-1 rounded-md"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </div>
-                  )}
-                </div>
-
-                {selectedMoviesList.length > 0 && (
-                  <div className="flex flex-wrap gap-2">
-                    {selectedMoviesList.map((m) => (
-                      <span key={m.tmdb_id} className="bg-rose-500/20 text-rose-300 border border-rose-500/30 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2">
-                        {m.title}
-                        <button onClick={() => setSelectedMoviesList((prev) => prev.filter((i) => i.tmdb_id !== m.tmdb_id))} className="hover:text-white font-bold">✕</button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                <button
-                  onClick={handleComboRecommend}
-                  disabled={loading || selectedMoviesList.length === 0}
-                  className="w-full bg-rose-500 hover:bg-rose-600 text-white font-semibold rounded-xl py-3 text-sm disabled:opacity-50"
-                >
-                  {loading ? 'Analyzing Vector Similarity...' : 'Generate Cosine Similarity Recommendations'}
-                </button>
-
-                {recommendations.length > 0 && (
-                  <div className="space-y-2 mt-4">
-                    {Array.from(
-                      new Map(recommendations.map(rec => [rec.tmdb_id, rec])).values()
-                    ).map((rec) => (
-                      <div key={rec.tmdb_id} className="flex justify-between items-center p-3 bg-slate-950 border border-slate-800 rounded-xl">
-                        <div className="flex items-center gap-3">
-                          {rec.poster_path ? (
-                            <img src={`${TMDB_CDN_BASE}${rec.poster_path}`} alt="" className="w-8 h-12 object-cover rounded-md" />
-                          ) : (
-                            <div className="w-8 h-12 bg-slate-800 rounded-md flex items-center justify-center">🎬</div>
-                          )}
-                          <span className="text-sm font-medium">{rec.title}</span>
-                        </div>
-                        
-                        <div className="flex items-center gap-3">
-                          <span className="text-xs font-bold text-emerald-400">
-                            {((rec.score || 0) * 100).toFixed(0)}% Cosine Similarity
-                          </span>
-                          <button
-                            onClick={() => handleAddWatch(rec.tmdb_id, rec.title, rec.poster_path || '')}
-                            className="text-xs font-bold bg-slate-800 hover:bg-rose-500 text-white px-3 py-1.5 rounded-lg transition"
-                          >
-                            + Watchlist
-                          </button>
-                        </div>
+                    <div className="p-3">
+                      <h3 className="text-sm font-bold text-slate-200 line-clamp-2 leading-snug">{m.title}</h3>
+                    </div>
+                    <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                      <div className="bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-all">
+                        + Add to Watchlist
                       </div>
-                    ))}
+                    </div>
                   </div>
-                )}
+                ))}
+              </div>
+            ) : (
+              <div className="bg-slate-900 rounded-2xl p-8 border border-slate-800 text-center text-slate-400">
+                <p>Rate some movies to get personalized recommendations!</p>
               </div>
             )}
-
-            {/* TAB: WATCHLIST & RATINGS */}
-            {activeTab === 'ratings' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <div className="flex justify-between items-center">
-                  <h2 className="text-md font-bold">Search & Add to Watchlist</h2>
-                  <span className="text-xs text-slate-500">{ratingMoviesList.length} in Watchlist</span>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search TMDB to add movies..."
-                    value={ratingsSearch}
-                    onFocus={() => setIsRatingsDropdownOpen(true)}
-                    onBlur={() => setTimeout(() => setIsRatingsDropdownOpen(false), 200)}
-                    onChange={(e) => {
-                      setRatingsSearch(e.target.value);
-                      setIsRatingsDropdownOpen(true);
-                    }}
-                    className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm"
-                  />
-
-                  {isRatingsDropdownOpen && (
-  <div className="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-800 max-h-56 overflow-y-auto rounded-xl z-20 shadow-2xl">
-    {ratingsSearch.trim() !== '' && ratingsSearchResults.length > 0 && (
-      ratingsSearchResults.map((m) => (
-        <button
-          key={m.tmdb_id}
-          onMouseDown={(e) => {
-            e.preventDefault(); // 👈 Prevents input blur from cancelling the action
-            handleAddWatch(m.tmdb_id, m.title, m.poster_path || '');
-            logRecentSearch(m.title);
-            setRatingsSearch('');
-            setIsRatingsDropdownOpen(false);
-          }}
-          className="w-full text-left px-4 py-2.5 text-xs hover:bg-slate-800 text-slate-200 border-b border-slate-800/50 last:border-none flex items-center justify-between cursor-pointer"
-        >
-          <span className="flex items-center gap-2">
-            {m.poster_path && (
-              <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt="" className="w-5 h-7 object-cover rounded" />
-            )}
-            {m.title}
-          </span>
-          <span className="text-[10px] text-rose-400 uppercase font-bold">+ Watchlist</span>
-        </button>
-      ))
-    )}
-
-    {ratingsSearch.trim() === '' && recentSearches.length > 0 && (
-      <div className="p-2">
-        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider px-2 py-1">🕒 Recent Searches</div>
-        {recentSearches.map((term, idx) => (
-          <div
-            key={idx}
-            onMouseDown={(e) => {
-              e.preventDefault();
-              setRatingsSearch(term);
-            }}
-            className="group w-full text-left px-3 py-2 text-xs hover:bg-slate-800 text-slate-300 rounded-lg flex items-center justify-between cursor-pointer"
-          >
-            <div className="flex items-center gap-2 truncate pr-2">
-              <span className="text-slate-500">🔍</span>
-              <span className="truncate">{term}</span>
-            </div>
-            <button
-              onMouseDown={(e) => handleDeleteRecentSearch(term, e)}
-              className="text-slate-500 hover:text-rose-400 p-1 rounded-md"
-            >
-              ✕
-            </button>
-          </div>
-        ))}
-      </div>
-    )}
-  </div>
-)}
-                </div>
-
-                {ratingMoviesList.length > 0 ? (
-                  <div className="space-y-2 max-h-[500px] overflow-y-auto pr-1">
-                    {ratingMoviesList.map((item) => (
-                      <MovieRatingRow
-                        key={item.tmdb_id}
-                        item={item}
-                        onRate={(newRating) => handleRateMovie(item.tmdb_id, newRating)}
-                        onUnwatch={() => handleUnwatch(item.tmdb_id)}
-                        isUpdating={updatingMovies.has(item.tmdb_id)}
-                      />
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-xs text-slate-500 py-4">Your watchlist is empty. Use the search bar above to search and add movies!</p>
-                )}
-              </div>
-            )}
-
-            {/* TAB: SETTINGS */}
-            {activeTab === 'settings' && (
-              <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 space-y-4">
-                <h2 className="text-md font-bold text-slate-100">⚙️ Settings</h2>
-                {updateMessage && <div className="p-3 bg-emerald-950/60 text-emerald-300 text-xs rounded-xl">{updateMessage}</div>}
-                <form onSubmit={handleProfileUpdate} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">New Username</label>
-                    <input type="text" placeholder="New Username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">New Password</label>
-                    <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm" />
-                  </div>
-                  <button type="submit" disabled={updateLoading || (!newUsername.trim() && !newPassword)} className="w-full bg-rose-500 hover:bg-rose-600 text-white font-medium rounded-xl py-3 px-4 disabled:opacity-50">
-                    {updateLoading ? 'Saving...' : 'Commit Changes'}
-                  </button>
-                </form>
-              </div>
-            )}
-
           </div>
         )}
 
-      </div>
+        {activeTab === 'combo' && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-100 mb-2">Combo Search</h2>
+              <p className="text-sm text-slate-400 mb-6">Select up to 5 movies to blend their vibes.</p>
+              
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search to add movies..."
+                  value={comboSearch}
+                  onChange={(e) => {
+                    setComboSearch(e.target.value);
+                    setIsComboDropdownOpen(true);
+                  }}
+                  onFocus={() => setIsComboDropdownOpen(true)}
+                  onBlur={() => setTimeout(() => setIsComboDropdownOpen(false), 200)}
+                  className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl px-5 py-4 focus:outline-none focus:border-indigo-500 transition-colors shadow-lg"
+                />
+                
+                {isComboDropdownOpen && comboSearchResults.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-80 overflow-y-auto z-50">
+                    {comboSearchResults.map((m) => (
+                      <div 
+                        key={m.tmdb_id} 
+                        className="flex items-center gap-3 p-3 hover:bg-slate-800 cursor-pointer transition-colors"
+                        onClick={() => {
+                          if (selectedMoviesList.length < 5 && !selectedMoviesList.some((sm) => sm.tmdb_id === m.tmdb_id)) {
+                            setSelectedMoviesList([...selectedMoviesList, m]);
+                          }
+                          setIsComboDropdownOpen(false);
+                          setComboSearch('');
+                        }}
+                      >
+                        {m.poster_path ? (
+                          <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt={m.title} className="w-8 h-12 object-cover rounded bg-slate-800" />
+                        ) : (
+                          <div className="w-8 h-12 bg-slate-800 rounded flex items-center justify-center text-[10px]">🎬</div>
+                        )}
+                        <span className="text-sm font-medium text-slate-200">{m.title}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedMoviesList.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {selectedMoviesList.map((m) => (
+                    <div key={m.tmdb_id} className="bg-indigo-900/50 text-indigo-200 border border-indigo-500/30 text-xs font-semibold px-3 py-1.5 rounded-full flex items-center gap-2">
+                      {m.title}
+                      <button onClick={() => setSelectedMoviesList(selectedMoviesList.filter((sm) => sm.tmdb_id !== m.tmdb_id))} className="text-indigo-400 hover:text-indigo-200">✕</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <button 
+                onClick={getRecommendations} 
+                disabled={selectedMoviesList.length === 0 || loading} 
+                className="mt-6 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-indigo-900/20"
+              >
+                {loading ? 'Analyzing Vibe...' : 'Blend & Recommend'}
+              </button>
+            </div>
+
+            {error && <div className="p-4 bg-rose-950/50 border border-rose-500/30 text-rose-300 rounded-xl text-sm">{error}</div>}
+
+            {recommendations.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-bold text-slate-200 mb-4 flex items-center gap-2">
+                  <span className="text-xl">✨</span> Hybrid Results
+                </h3>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {recommendations.map((m, idx) => (
+                    <div key={idx} className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all group relative cursor-pointer" onClick={() => handleAddWatch(m.tmdb_id, m.title, m.poster_path)}>
+                      <div className="aspect-[2/3] bg-slate-800 relative">
+                        {m.poster_path ? (
+                          <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt={m.title} className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-4xl">🎬</div>
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent opacity-80" />
+                        <div className="absolute top-2 right-2 bg-indigo-600/90 backdrop-blur text-white text-[10px] font-bold px-2 py-1 rounded-full shadow-lg">
+                          {(m.score! * 100).toFixed(0)}% Match
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <h3 className="text-sm font-bold text-slate-200 line-clamp-2 leading-snug">{m.title}</h3>
+                      </div>
+                      <div className="absolute inset-0 bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                        <div className="bg-indigo-600 text-white text-xs font-bold px-4 py-2 rounded-full shadow-xl transform translate-y-4 group-hover:translate-y-0 transition-all">
+                          + Add to Watchlist
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {activeTab === 'ratings' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <h2 className="text-2xl font-bold text-slate-100">Watchlist & Ratings</h2>
+            </div>
+            
+            <div className="relative z-40">
+              <input
+                type="text"
+                placeholder="Search movies to add..."
+                value={ratingsSearch}
+                onChange={(e) => {
+                  setRatingsSearch(e.target.value);
+                  setIsRatingsDropdownOpen(true);
+                }}
+                onFocus={() => setIsRatingsDropdownOpen(true)}
+                onBlur={() => setTimeout(() => setIsRatingsDropdownOpen(false), 200)}
+                className="w-full bg-slate-900 border border-slate-800 text-slate-100 rounded-2xl px-5 py-4 focus:outline-none focus:border-indigo-500 transition-colors shadow-lg"
+              />
+              
+              {isRatingsDropdownOpen && (ratingsSearchResults.length > 0 || recentSearches.length > 0) && (
+                <div className="absolute top-full left-0 right-0 mt-2 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden flex flex-col max-h-[400px]">
+                  
+                  {ratingsSearchResults.length > 0 && (
+                    <div className="overflow-y-auto flex-1 p-2">
+                      {ratingsSearchResults.map((m) => (
+                        <div 
+                          key={m.tmdb_id} 
+                          className="flex items-center gap-3 p-2 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+                          onClick={() => handleMovieSelect(m)}
+                        >
+                          {m.poster_path ? (
+                            <img src={`${TMDB_CDN_BASE}${m.poster_path}`} alt={m.title} className="w-8 h-12 object-cover rounded-md bg-slate-800" />
+                          ) : (
+                            <div className="w-8 h-12 bg-slate-800 rounded-md flex items-center justify-center text-[10px]">🎬</div>
+                          )}
+                          <span className="text-sm font-medium text-slate-200">{m.title}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {!ratingsSearch.trim() && recentSearches.length > 0 && (
+                    <div className="p-2 border-t border-slate-800">
+                      <div className="text-xs font-bold text-slate-500 uppercase px-2 mb-2">Recent Searches</div>
+                      {recentSearches.map((movie, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => handleMovieSelect(movie)}
+                          className="flex items-center justify-between p-2 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            {movie.poster_path ? (
+                              <img 
+                                src={`${TMDB_CDN_BASE}${movie.poster_path}`} 
+                                alt={movie.title} 
+                                className="w-8 h-12 object-cover rounded-md bg-slate-800" 
+                              />
+                            ) : (
+                              <div className="w-8 h-12 bg-slate-800 rounded-md flex items-center justify-center text-xs">🎬</div>
+                            )}
+                            <span className="text-sm text-slate-300">{movie.title}</span>
+                          </div>
+                          
+                          <button
+                            onMouseDown={(e) => e.preventDefault()} 
+                            onClick={(e) => handleDeleteRecentSearch(movie, e)}
+                            className="text-slate-500 hover:text-rose-400 p-1"
+                            title="Remove from history"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                </div>
+              )}
+            </div>
+
+            <div>
+              {focusedWatchlistId && (
+                <div className="mb-4 p-3 bg-indigo-950/50 border border-indigo-500/30 rounded-xl flex justify-between items-center text-sm">
+                  <span className="text-indigo-200">Showing specific search result.</span>
+                  <button 
+                    onClick={() => setFocusedWatchlistId(null)}
+                    className="text-indigo-400 hover:text-indigo-300 font-semibold"
+                  >
+                    Clear Filter
+                  </button>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2">
+                {userData?.ratings
+                  ?.filter((item) => focusedWatchlistId ? item.tmdb_id === focusedWatchlistId : true)
+                  .filter((item) => item.title.toLowerCase().includes(ratingsSearch.toLowerCase()))
+                  .map((item) => (
+                    <MovieRatingRow
+                      key={item.tmdb_id}
+                      item={item}
+                      isUpdating={updatingMovies.has(item.tmdb_id)}
+                      onRate={(val) => handleRateMovie(item.tmdb_id, val)}
+                      onUnwatch={() => handleUnwatch(item.tmdb_id)}
+                    />
+                  ))}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'settings' && (
+          <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-slate-900 rounded-2xl p-6 border border-slate-800 shadow-xl max-w-md mx-auto mt-8">
+                <h2 className="text-md font-bold text-slate-100 mb-4">⚙️ Settings</h2>
+                {updateMessage && <div className="mb-4 p-3 bg-emerald-950/60 text-emerald-300 text-xs rounded-xl border border-emerald-500/30">{updateMessage}</div>}
+                <form onSubmit={handleProfileUpdate} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">New Username</label>
+                    <input type="text" placeholder="New Username" value={newUsername} onChange={(e) => setNewUsername(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-slate-400 uppercase mb-1">New Password</label>
+                    <input type="password" placeholder="New Password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 text-slate-100 rounded-xl px-4 py-3 text-sm focus:outline-none focus:border-indigo-500 transition-colors" />
+                  </div>
+                  <button type="submit" disabled={updateLoading || (!newUsername.trim() && !newPassword)} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium rounded-xl py-3 px-4 disabled:opacity-50 transition-colors mt-2">
+                    {updateLoading ? 'Saving...' : 'Commit Changes'}
+                  </button>
+                </form>
+            </div>
+          </div>
+        )}
+      </main>
     </div>
   );
 }
