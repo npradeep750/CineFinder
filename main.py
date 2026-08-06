@@ -394,25 +394,55 @@ def get_hybrid_recommendations(body: RecommendRequest):
     movies_list = CATALOG_CACHE["movies_list"]
     tfidf_matrix = CATALOG_CACHE["tfidf_matrix"]
     id_to_idx = CATALOG_CACHE["id_to_idx"]
+    vectorizer = CATALOG_CACHE["tfidf_vectorizer"]
 
-    matched_indices = [id_to_idx[t_id] for t_id in body.tmdb_ids if t_id in id_to_idx]
-    if not matched_indices:
-        raise HTTPException(status_code=404, detail="Selected movies not found in index.")
+    matched_vectors = []
+    selected_titles = set()
 
-    matched_matrix = tfidf_matrix[matched_indices]
-    blended_vector = np.asarray(matched_matrix.mean(axis=0))
+    # 1. Gather vectors for all requested movies
+    for t_id in body.tmdb_ids:
+        if t_id in id_to_idx:
+            # 🟢 Movie is in our pre-loaded catalog
+            m_idx = id_to_idx[t_id]
+            matched_vectors.append(tfidf_matrix[m_idx].toarray()[0])
+            selected_titles.add(CATALOG_CACHE["id_to_movie"][t_id]["title"].strip().lower())
+        else:
+            # 🔴 Movie is missing! Fetch it dynamically on-the-fly
+            try:
+                # Fetch basic details for the title
+                details_res = requests.get(f"{TMDB_BASE_URL}/movie/{t_id}?api_key={TMDB_API_KEY}", timeout=3)
+                if details_res.status_code == 200:
+                    title = details_res.json().get("title", "")
+                    
+                    # Fetch keywords using your existing function
+                    keywords_str = fetch_movie_keywords(t_id)
+                    
+                    # Recreate the exact same feature string format
+                    rich_feature_string = f"{(title.replace(' ', '') + ' ') * 2} {(keywords_str + ' ') * 5}"
+                    
+                    # Transform the string into a vector using the trained vectorizer
+                    dynamic_vector = vectorizer.transform([rich_feature_string]).toarray()[0]
+                    matched_vectors.append(dynamic_vector)
+                    
+                    if title:
+                        selected_titles.add(title.strip().lower())
+            except Exception as e:
+                print(f"Failed to fetch missing movie {t_id}: {e}")
+                continue
+
+    if not matched_vectors:
+        raise HTTPException(status_code=404, detail="Could not process any of the selected movies.")
+
+    # 2. Compute Blended Vector and Cosine Similarity
+    # Convert list of vectors to numpy array, get the mean, and reshape for similarity
+    blended_vector = np.mean(matched_vectors, axis=0).reshape(1, -1)
     sim_scores = cosine_similarity(blended_vector, tfidf_matrix)[0]
 
     scored = sorted(zip(movies_list, sim_scores), key=lambda x: x[1], reverse=True)
     
-    # Get titles of user-selected input movies
-    selected_titles = {
-        CATALOG_CACHE["id_to_movie"][t_id]["title"].strip().lower()
-        for t_id in body.tmdb_ids if t_id in CATALOG_CACHE["id_to_movie"]
-    }
-    
-    seen_titles = set(selected_titles)
+    # 3. Filter out selected movies and duplicates
     results = []
+    seen_titles = set(selected_titles)
     
     for m, s in scored:
         norm_title = m["title"].strip().lower()
