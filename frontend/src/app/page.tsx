@@ -160,8 +160,20 @@ export default function MovieRecommender() {
         fetchUserData(session.access_token);
         fetchRecentSearches(session.access_token);
       } else {
+        
         setUserData(null);
         setRecentSearches([]);
+        
+        setRecommendations([]);
+        setSelectedMoviesList([]);
+        setComboSearch('');
+        setComboSearchResults([]);
+        
+        setRatingsSearch('');
+        setRatingsSearchResults([]);
+        setFocusedWatchlistId(null);
+        setActiveTab('recommendations');
+        setError('');
       }
     });
 

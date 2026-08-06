@@ -13,7 +13,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 from supabase import create_client
 
 SUPABASE_URL = "https://kxqiovrdimaproigfeyc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4cWlvdnJkaW1hcHJvaWdmZXljIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM5OTgwNTMsImV4cCI6MjA5OTU3NDA1M30.CMu84XvMMjVLeN_mWtzFbDni-oZGNmrBDRCDJ7L-Clo"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt4cWlvdnJkaW1hcHJvaWdmZXljIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc4Mzk5ODA1MywiZXhwIjoyMDk5NTc0MDUzfQ.RCopEBM1wxByqsh3GoJ6b-OQEk2eHeD0zA5T3vLNyfY"
 
 TMDB_API_KEY = "901696f09bee18449863e03f2da050e0"
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
