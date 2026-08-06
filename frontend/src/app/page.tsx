@@ -147,7 +147,7 @@ export default function MovieRecommender() {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
-      if (session) {
+      if (session?.access_token) { // 🚀 Only call when token is guaranteed
         fetchUserData(session.access_token);
         fetchRecentSearches(session.access_token);
       }
@@ -155,7 +155,7 @@ export default function MovieRecommender() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
-      if (session) {
+      if (session?.access_token) { // 🚀 Only call when token is guaranteed
         fetchUserData(session.access_token);
         fetchRecentSearches(session.access_token);
       } else {

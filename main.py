@@ -20,7 +20,6 @@ TMDB_BASE_URL = "https://api.themoviedb.org/3"
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# 🚀 IN-MEMORY CATALOG & VECTOR CACHE
 CATALOG_CACHE = {
     "movies_list": [],
     "id_to_movie": {},
@@ -57,7 +56,6 @@ def load_catalog_and_build_vectors():
             if res.status_code == 200:
                 for m in res.json().get("results", []):
                     title = m["title"]
-                    # 🚀 Normalize title to catch duplicate entries
                     normalized_title = title.strip().lower()
                     
                     if normalized_title in seen_titles:
@@ -222,7 +220,6 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
     profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
     username = profile_res.data[0].get("username") if profile_res.data else "User"
 
-    # 1. Fetch User Watches
     watches_res = supabase.table("user_watches").select("tmdb_id, movie, poster_path").eq("user_id", user_id).execute()
     watched_map = {}
 
@@ -235,7 +232,6 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                 "poster_path": r.get("poster_path") or ""
             }
 
-    # 2. Fetch User Ratings
     ratings_res = supabase.table("user_ratings").select("tmdb_id, rating, movie, poster_path").eq("user_id", user_id).execute()
     user_ratings = {}
     
@@ -250,7 +246,6 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                     "poster_path": r.get("poster_path") or ""
                 }
 
-    # 3. Build Watchlist Display Output
     ratings_display = []
     for t_id, m_info in watched_map.items():
         m_copy = dict(m_info)
@@ -262,7 +257,6 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
         key=lambda x: (0 if x["rating"] == 0.0 else 1, -x["rating"], x["title"].lower())
     )
 
-    # 🚀 4. KEYWORD COSINE SIMILARITY VECTOR CALCULATIONS
     personalized_recommendations = []
     movies_list = CATALOG_CACHE["movies_list"]
     tfidf_matrix = CATALOG_CACHE["tfidf_matrix"]
@@ -281,14 +275,12 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
             user_profile_vec = np.mean(weighted_vectors, axis=0).reshape(1, -1)
             watched_ids = set(watched_map.keys())
 
-            # Gather all titles already in watched/rated list (lowercased)
             watched_titles = {
                 m_info["title"].strip().lower() 
                 for m_info in watched_map.values() 
                 if m_info.get("title")
             }
 
-            # Filter unwatched movies by BOTH tmdb_id AND title
             unwatched_movies = [
                 m for m in movies_list 
                 if m["tmdb_id"] not in watched_ids and m["title"].strip().lower() not in watched_titles
@@ -300,7 +292,6 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                 sim_scores = cosine_similarity(user_profile_vec, unwatched_matrix)[0]
                 scored = sorted(zip(unwatched_movies, sim_scores), key=lambda x: x[1], reverse=True)
                 
-                # Prevent duplicate titles within the recommendation results list itself
                 seen_rec_titles = set(watched_titles)
                 
                 for m, s in scored:
@@ -334,7 +325,6 @@ def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id))
             if body.poster_path:
                 payload["poster_path"] = body.poster_path
 
-            # 🚀 Check existing rating to prevent 500 error on UPSERT without keys
             existing_rating = supabase.table("user_ratings").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
             if existing_rating.data:
                 supabase.table("user_ratings").update(payload).eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
@@ -366,7 +356,6 @@ def mark_movie_as_watched(body: WatchRequest, user_id: str = Depends(get_current
         if body.poster_path:
             payload["poster_path"] = body.poster_path
 
-        # 🚀 Check existing watch
         existing_watch = supabase.table("user_watches").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
         if existing_watch.data:
             supabase.table("user_watches").update(payload).eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
@@ -399,28 +388,22 @@ def get_hybrid_recommendations(body: RecommendRequest):
     matched_vectors = []
     selected_titles = set()
 
-    # 1. Gather vectors for all requested movies
     for t_id in body.tmdb_ids:
         if t_id in id_to_idx:
-            # 🟢 Movie is in our pre-loaded catalog
             m_idx = id_to_idx[t_id]
             matched_vectors.append(tfidf_matrix[m_idx].toarray()[0])
             selected_titles.add(CATALOG_CACHE["id_to_movie"][t_id]["title"].strip().lower())
         else:
-            # 🔴 Movie is missing! Fetch it dynamically on-the-fly
             try:
                 # Fetch basic details for the title
                 details_res = requests.get(f"{TMDB_BASE_URL}/movie/{t_id}?api_key={TMDB_API_KEY}", timeout=3)
                 if details_res.status_code == 200:
                     title = details_res.json().get("title", "")
                     
-                    # Fetch keywords using your existing function
                     keywords_str = fetch_movie_keywords(t_id)
                     
-                    # Recreate the exact same feature string format
                     rich_feature_string = f"{(title.replace(' ', '') + ' ') * 2} {(keywords_str + ' ') * 5}"
                     
-                    # Transform the string into a vector using the trained vectorizer
                     dynamic_vector = vectorizer.transform([rich_feature_string]).toarray()[0]
                     matched_vectors.append(dynamic_vector)
                     
@@ -433,14 +416,11 @@ def get_hybrid_recommendations(body: RecommendRequest):
     if not matched_vectors:
         raise HTTPException(status_code=404, detail="Could not process any of the selected movies.")
 
-    # 2. Compute Blended Vector and Cosine Similarity
-    # Convert list of vectors to numpy array, get the mean, and reshape for similarity
     blended_vector = np.mean(matched_vectors, axis=0).reshape(1, -1)
     sim_scores = cosine_similarity(blended_vector, tfidf_matrix)[0]
 
     scored = sorted(zip(movies_list, sim_scores), key=lambda x: x[1], reverse=True)
     
-    # 3. Filter out selected movies and duplicates
     results = []
     seen_titles = set(selected_titles)
     

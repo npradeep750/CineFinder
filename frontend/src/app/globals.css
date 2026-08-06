@@ -1,8 +1,7 @@
 @import "tailwindcss";
 
-/* Custom background defaults to ensure a smooth look */
 body {
-  background-color: #f8fafc; /* Slate-50 matching our UI */
-  color: #0f172a;           /* Slate-900 */
+  background-color: #f8fafc; 
+  color: #0f172a;           
   -webkit-font-smoothing: antialiased;
 }
