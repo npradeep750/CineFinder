@@ -128,6 +128,7 @@ export default function MovieRecommender() {
   const [userData, setUserData] = useState<UserHistory | null>(null);
   const [activeTab, setActiveTab] = useState<'recommendations' | 'combo' | 'ratings' | 'settings'>('recommendations');
   const [focusedWatchlistId, setFocusedWatchlistId] = useState<number | null>(null);
+  const [displayOrder, setDisplayOrder] = useState<number[] | null>(null);
   
   const [updatingMovies, setUpdatingMovies] = useState<Set<number>>(new Set());
   const [selectedMoviesList, setSelectedMoviesList] = useState<Movie[]>([]);
@@ -198,6 +199,35 @@ export default function MovieRecommender() {
 
     return () => clearTimeout(timer);
   }, [ratingsSearch]);
+
+  useEffect(() => {
+    if (activeTab === 'ratings') {
+      setDisplayOrder((prev) => {
+        if (prev === null && userData?.ratings) {
+          // Force a strict, mathematically correct sort before snapping the order
+          const perfectlySorted = [...userData.ratings].sort((a, b) => {
+            const isAUnrated = a.rating === 0;
+            const isBUnrated = b.rating === 0;
+            
+            // Unrated movies sit at the very top
+            if (isAUnrated && !isBUnrated) return -1;
+            if (!isAUnrated && isBUnrated) return 1;
+            
+            // Rated movies sort highest to lowest
+            if (a.rating !== b.rating) return b.rating - a.rating;
+            
+            // Alphabetical fallback
+            return a.title.localeCompare(b.title);
+          });
+          return perfectlySorted.map((r) => r.tmdb_id);
+        }
+        return prev;
+      });
+    } else {
+      // Reset the frozen order when leaving the tab
+      setDisplayOrder(null);
+    }
+  }, [activeTab, userData?.ratings]);
 
   const fetchUserData = async (token: string) => {
     try {
@@ -356,14 +386,20 @@ export default function MovieRecommender() {
       if (!prev) return null;
       const existing = prev.ratings || [];
       if (existing.some((item) => item.tmdb_id === tmdb_id)) return prev;
+      
       return {
         ...prev,
+        // Remove the newly added movie from the For You tab instantly
+        personalized_recommendations: prev.personalized_recommendations?.filter(
+          (m) => m.tmdb_id !== tmdb_id
+        ),
         ratings: [
           { tmdb_id, title: title || `Movie #${tmdb_id}`, poster_path: poster_path || '', rating: 0 },
           ...existing,
         ],
       };
     });
+    
     setUpdatingMovies((prev) => new Set(prev).add(tmdb_id));
     try {
       const res = await fetch(`${API_URL}/watch`, {
@@ -473,6 +509,34 @@ export default function MovieRecommender() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const getSortedDisplayRatings = () => {
+    if (!userData?.ratings) return [];
+    
+    const baselineSorted = [...userData.ratings].sort((a, b) => {
+      const isAUnrated = a.rating === 0;
+      const isBUnrated = b.rating === 0;
+      if (isAUnrated && !isBUnrated) return -1;
+      if (!isAUnrated && isBUnrated) return 1;
+      if (a.rating !== b.rating) return b.rating - a.rating;
+      return a.title.localeCompare(b.title);
+    });
+
+    if (!displayOrder) return baselineSorted;
+    
+    return baselineSorted.sort((a, b) => {
+      const indexA = displayOrder.indexOf(a.tmdb_id);
+      const indexB = displayOrder.indexOf(b.tmdb_id);
+      
+      // Keep existing items in their snapped order
+      if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+      // Push brand new additions to the very top immediately
+      if (indexA === -1 && indexB !== -1) return -1;
+      if (indexA !== -1 && indexB === -1) return 1;
+      
+      return 0;
+    });
   };
 
   if (!session) {
@@ -764,8 +828,8 @@ export default function MovieRecommender() {
               )}
 
               <div className="flex flex-col gap-2">
-                {userData?.ratings
-                  ?.filter((item) => focusedWatchlistId ? item.tmdb_id === focusedWatchlistId : true)
+                {getSortedDisplayRatings()
+                  .filter((item) => focusedWatchlistId ? item.tmdb_id === focusedWatchlistId : true)
                   .filter((item) => item.title.toLowerCase().includes(ratingsSearch.toLowerCase()))
                   .map((item) => (
                     <MovieRatingRow
