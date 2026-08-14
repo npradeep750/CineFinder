@@ -220,7 +220,8 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
     profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
     username = profile_res.data[0].get("username") if profile_res.data else "User"
 
-    watches_res = supabase.table("user_watches").select("tmdb_id, movie, poster_path").eq("user_id", user_id).execute()
+    # Select created_at timestamptz from user_watches to support sorting by recently added
+    watches_res = supabase.table("user_watches").select("tmdb_id, movie, poster_path, created_at").eq("user_id", user_id).execute()
     watched_map = {}
 
     for r in (watches_res.data or []):
@@ -229,7 +230,8 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
             watched_map[t_id] = {
                 "tmdb_id": t_id,
                 "title": r.get("movie") or f"Movie #{t_id}",
-                "poster_path": r.get("poster_path") or ""
+                "poster_path": r.get("poster_path") or "",
+                "created_at": r.get("created_at")
             }
 
     ratings_res = supabase.table("user_ratings").select("tmdb_id, rating, movie, poster_path").eq("user_id", user_id).execute()
@@ -243,7 +245,8 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
                 watched_map[t_id] = {
                     "tmdb_id": t_id,
                     "title": r.get("movie") or f"Movie #{t_id}",
-                    "poster_path": r.get("poster_path") or ""
+                    "poster_path": r.get("poster_path") or "",
+                    "created_at": None
                 }
 
     ratings_display = []
@@ -395,18 +398,13 @@ def get_hybrid_recommendations(body: RecommendRequest):
             selected_titles.add(CATALOG_CACHE["id_to_movie"][t_id]["title"].strip().lower())
         else:
             try:
-                # Fetch basic details for the title
                 details_res = requests.get(f"{TMDB_BASE_URL}/movie/{t_id}?api_key={TMDB_API_KEY}", timeout=3)
                 if details_res.status_code == 200:
                     title = details_res.json().get("title", "")
-                    
                     keywords_str = fetch_movie_keywords(t_id)
-                    
                     rich_feature_string = f"{(title.replace(' ', '') + ' ') * 2} {(keywords_str + ' ') * 5}"
-                    
                     dynamic_vector = vectorizer.transform([rich_feature_string]).toarray()[0]
                     matched_vectors.append(dynamic_vector)
-                    
                     if title:
                         selected_titles.add(title.strip().lower())
             except Exception as e:
