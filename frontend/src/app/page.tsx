@@ -1037,15 +1037,50 @@ export default function CineFinder() {
                       <ResponsiveContainer width="100%" height="100%">
                         <RadarChart
                           data={genreRadarData}
-                          outerRadius="75%"
-                          margin={{ top: 20, right: 30, bottom: 20, left: 30 }}
+                          outerRadius="100%"
+                          margin={{ top: 35, right: 55, bottom: 35, left: 55 }}
                         >
-                          <PolarGrid stroke="rgba(255,255,255,0.06)" />
+                          <PolarGrid
+                            stroke="rgba(226, 232, 240, 0.20)"
+                            strokeWidth={2}
+                          />
+
                           <PolarAngleAxis
                             dataKey="genre"
-                            tick={{ fill: "#64748b", fontSize: 10 }}
+                            tick={({ payload, x, y, textAnchor }) => {
+                              const words = payload.value.split(" ");
+
+                              const offsetY =
+                                textAnchor === "middle"
+                                  ? Number(y) < 150
+                                    ? -10
+                                    : 10
+                                  : 0;
+
+                              return (
+                                <text
+                                  x={x}
+                                  y={Number(y) + offsetY}
+                                  textAnchor={textAnchor}
+                                  fill="#94a3b8"
+                                  fontSize={12}
+                                >
+                                  {words.map((word: string, index: number) => (
+                                    <tspan
+                                      key={index}
+                                      x={x}
+                                      dy={index === 0 ? 0 : 13}
+                                    >
+                                      {word}
+                                    </tspan>
+                                  ))}
+                                </text>
+                              );
+                            }}
                           />
+
                           <Tooltip content={<CustomTooltip />} />
+
                           <Radar
                             name="Metadata Profile"
                             dataKey="value"
