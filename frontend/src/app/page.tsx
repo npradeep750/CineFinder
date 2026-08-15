@@ -1,8 +1,14 @@
 "use client";
 
-import { useState, useEffect, FormEvent } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  useCallback,
+  FormEvent,
+} from "react";
 import { createClient } from "@supabase/supabase-js";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion, AnimatePresence, type Variants } from "framer-motion";
 import {
   Search,
   Star,
@@ -11,7 +17,6 @@ import {
   Film,
   X,
   PlaySquare,
-  TrendingUp,
   CheckCircle2,
   Trash2,
   Sparkles,
@@ -80,6 +85,80 @@ const LoadingSpinner = () => (
   </motion.div>
 );
 
+// Staggered entrance orchestration for recommendation grids
+const staggerContainer: Variants = {
+  hidden: {},
+  show: {
+    transition: { staggerChildren: 0.06, delayChildren: 0.03 },
+  },
+};
+
+const cardItem: Variants = {
+  hidden: { opacity: 0, y: 24, scale: 0.97 },
+  show: {
+    opacity: 1,
+    y: 0,
+    scale: 1,
+    transition: { type: "spring", stiffness: 300, damping: 24 },
+  },
+};
+
+// Ambient animated background shared by the auth and app screens
+const AnimatedBackground = () => (
+  <div
+    aria-hidden="true"
+    className="fixed inset-0 -z-10 pointer-events-none overflow-hidden"
+  >
+    <div className="absolute inset-0 animated-grid" />
+    <div className="absolute -top-32 -left-32 w-[480px] h-[480px] rounded-full bg-indigo-600/20 blur-[120px] animate-float-slow" />
+    <div className="absolute -bottom-40 -right-32 w-[520px] h-[520px] rounded-full bg-fuchsia-600/15 blur-[130px] animate-float-slower" />
+    <div className="absolute top-1/3 left-1/2 -translate-x-1/2 w-[380px] h-[380px] rounded-full bg-cyan-500/10 blur-[120px] animate-float-slow" />
+  </div>
+);
+
+// Animated number that eases toward its target
+function CountUp({ value }: { value: number }) {
+  const [display, setDisplay] = useState(value);
+  const previous = useRef(value);
+
+  useEffect(() => {
+    const from = previous.current;
+    const to = value;
+    if (from === to) return;
+
+    let frame = 0;
+    const start = performance.now();
+    const duration = 500;
+
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setDisplay(Math.round(from + (to - from) * eased));
+      if (progress < 1) {
+        frame = requestAnimationFrame(step);
+      } else {
+        previous.current = to;
+      }
+    };
+
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value]);
+
+  return <>{display}</>;
+}
+
+// Shimmering placeholder cards shown while user data loads
+function SkeletonGrid({ count = 10 }: { count?: number }) {
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+      {Array.from({ length: count }).map((_, i) => (
+        <div key={i} className="aspect-[2/3] rounded-2xl skeleton" />
+      ))}
+    </div>
+  );
+}
+
 function MovieCard({
   movie,
   onAction,
@@ -95,11 +174,13 @@ function MovieCard({
   matchScore?: number;
   onCardClick?: () => void;
 }) {
+  const matchPct =
+    matchScore !== undefined ? Math.min(1, Math.max(0, matchScore)) : 0;
+
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
+      variants={cardItem}
       whileHover={{ y: -8, transition: { duration: 0.2, ease: "easeOut" } }}
       whileTap={{ scale: 0.98 }}
       onClick={onCardClick}
@@ -118,11 +199,50 @@ function MovieCard({
           </div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#030712] via-[#030712]/40 to-transparent opacity-80 group-hover:opacity-90 transition-opacity" />
+        <div className="shine" />
 
         {matchScore !== undefined && (
-          <div className="absolute top-3 right-3 bg-[#030712]/80 backdrop-blur-md text-emerald-400 border border-emerald-500/20 text-[10px] font-semibold tracking-wider px-2.5 py-1 rounded-full shadow-lg flex items-center gap-1.5">
-            <TrendingUp size={10} /> {(matchScore * 100).toFixed(0)}% Match
-          </div>
+          <motion.div
+            initial={{ scale: 0, rotate: -90 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 260,
+              damping: 20,
+              delay: 0.15,
+            }}
+            className="absolute top-3 right-3 bg-[#030712]/80 backdrop-blur-md rounded-full p-1.5 shadow-lg border border-emerald-500/20"
+            title={`${(matchPct * 100).toFixed(0)}% match`}
+          >
+            <div className="relative w-9 h-9">
+              <svg viewBox="0 0 36 36" className="w-9 h-9 -rotate-90">
+                <circle
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  fill="none"
+                  stroke="rgba(255,255,255,0.08)"
+                  strokeWidth="2.5"
+                />
+                <motion.circle
+                  cx="18"
+                  cy="18"
+                  r="15.5"
+                  fill="none"
+                  stroke="#34d399"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeDasharray={97.4}
+                  initial={{ strokeDashoffset: 97.4 }}
+                  animate={{ strokeDashoffset: 97.4 * (1 - matchPct) }}
+                  transition={{ duration: 0.9, ease: "easeOut", delay: 0.25 }}
+                />
+              </svg>
+              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-emerald-400">
+                {(matchPct * 100).toFixed(0)}
+              </span>
+            </div>
+          </motion.div>
         )}
       </div>
 
@@ -144,6 +264,52 @@ function MovieCard({
   );
 }
 
+function RecommendationSection({
+  title,
+  subtitle,
+  results,
+  onAction,
+  onCardClick,
+}: {
+  title: string;
+  subtitle: string;
+  results: Movie[];
+  onAction: (id: number) => void;
+  onCardClick: (id: number) => void;
+}) {
+  if (results.length === 0) return null;
+  return (
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+      <div className="flex items-center gap-2 mb-1">
+        <h3 className="text-lg font-bold text-white">{title}</h3>
+        <span className="text-[10px] font-semibold text-indigo-400 bg-indigo-500/10 border border-indigo-500/20 px-2 py-0.5 rounded-full">
+          {results.length}
+        </span>
+      </div>
+      <p className="text-xs text-slate-400 mb-4">{subtitle}</p>
+      <motion.div
+        layout
+        variants={staggerContainer}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
+      >
+        {results.map((m) => (
+          <MovieCard
+            key={m.tmdb_id}
+            movie={m}
+            actionLabel="Add to Watchlist"
+            actionIcon={CheckCircle2}
+            matchScore={m.score}
+            onAction={() => onAction(m.tmdb_id)}
+            onCardClick={() => onCardClick(m.tmdb_id)}
+          />
+        ))}
+      </motion.div>
+    </motion.div>
+  );
+}
+
 function WatchlistCard({
   item,
   onRate,
@@ -161,10 +327,10 @@ function WatchlistCard({
     <motion.div
       layout
       layoutId={`watchlist-item-${item.tmdb_id}`}
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      transition={{ duration: 0.2 }}
+      initial={{ opacity: 0, scale: 0.85, y: 12 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.85, y: 12 }}
+      transition={{ type: "spring", stiffness: 350, damping: 26 }}
       onClick={onOpenDetails}
       className="group relative p-[1px] rounded-2xl overflow-hidden transition-all duration-500 cursor-pointer"
     >
@@ -191,6 +357,8 @@ function WatchlistCard({
             </div>
           )}
 
+          <div className="shine" />
+
           <div className="absolute inset-0 bg-gradient-to-b from-slate-950/90 via-slate-950/20 to-transparent p-4">
             <h4 className="text-sm font-bold text-white line-clamp-1 drop-shadow-md">
               {item.title}
@@ -215,9 +383,15 @@ function WatchlistCard({
           className="p-3.5 bg-slate-900/90 backdrop-blur-md flex items-center justify-between border-t border-white/[0.06]"
           onClick={(e) => e.stopPropagation()}
         >
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+          <motion.span
+            key={item.rating}
+            initial={{ scale: 0.7, opacity: 0.4 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: "spring", stiffness: 500, damping: 18 }}
+            className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider"
+          >
             Your Rating ({item.rating})
-          </span>
+          </motion.span>
           <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((star) => {
               return (
@@ -315,12 +489,30 @@ export default function CineFinder() {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [isSearchingCombo, setIsSearchingCombo] = useState(false);
   const [selectedCombo, setSelectedCombo] = useState<Movie[]>([]);
-  const [comboResults, setComboResults] = useState<Movie[]>([]);
+  const [keywordResults, setKeywordResults] = useState<Movie[]>([]);
+  const [hybridResults, setHybridResults] = useState<Movie[]>([]);
   const [isBlending, setIsBlending] = useState(false);
 
   // Settings state
   const [newUsername, setNewUsername] = useState("");
   const [updateMessage, setUpdateMessage] = useState("");
+
+  // Toast notifications (visual feedback cues)
+  const [toasts, setToasts] = useState<
+    { id: number; message: string; tone: "success" | "info" }[]
+  >([]);
+  const toastCounter = useRef(0);
+
+  const pushToast = useCallback(
+    (message: string, tone: "success" | "info" = "success") => {
+      const id = ++toastCounter.current;
+      setToasts((prev) => [...prev, { id, message, tone }]);
+      window.setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 2800);
+    },
+    [],
+  );
 
   // Filtered & Sorted Watchlist logic (sorting 'recent' via created_at timestamptz)
   const allRatings = userData?.ratings || [];
@@ -329,6 +521,12 @@ export default function CineFinder() {
   const isInWatchlist = (tmdbId: number) => {
     return allRatings.some((item) => item.tmdb_id === tmdbId);
   };
+
+  // Current rating for the open movie details modal
+  const selectedRating = selectedMovie
+    ? allRatings.find((item) => item.tmdb_id === selectedMovie.tmdb_id)
+        ?.rating ?? 0
+    : 0;
 
   const filteredAndSortedRatings = allRatings
     .filter((item) => {
@@ -599,10 +797,18 @@ export default function CineFinder() {
       });
       if (res.ok) {
         const data = await res.json();
-        setComboResults(data.recommendations || []);
+        const keywordMatches = data.keyword_recommendations || [];
+        const hybridMatches = data.hybrid_recommendations || [];
+        setKeywordResults(keywordMatches);
+        setHybridResults(hybridMatches);
+        pushToast(
+          `Found ${keywordMatches.length + hybridMatches.length} matches`,
+          "info",
+        );
       }
     } catch (err) {
       console.error("Blend failed:", err);
+      pushToast("Could not generate matches", "info");
     } finally {
       setIsBlending(false);
     }
@@ -620,7 +826,13 @@ export default function CineFinder() {
         },
         body: JSON.stringify({ tmdb_id, rating }),
       });
-      if (res.ok) fetchUserData(session.access_token);
+      if (res.ok) {
+        fetchUserData(session.access_token);
+        pushToast(
+          rating === 0 ? "Rating removed" : `Saved ${rating}★ rating`,
+          "success",
+        );
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -640,7 +852,10 @@ export default function CineFinder() {
         },
         body: JSON.stringify({ tmdb_id }),
       });
-      if (res.ok) fetchUserData(session.access_token);
+      if (res.ok) {
+        fetchUserData(session.access_token);
+        pushToast("Removed from your watchlist", "success");
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -650,8 +865,8 @@ export default function CineFinder() {
 
   if (!session) {
     return (
-      <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none" />
+      <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-4 relative isolate font-sans">
+        <AnimatedBackground />
 
         <motion.div
           initial={{ y: 20, opacity: 0 }}
@@ -757,7 +972,9 @@ export default function CineFinder() {
   }
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-200 font-sans selection:bg-indigo-500/30">
+    <div className="min-h-screen bg-[#030712] text-slate-200 font-sans selection:bg-indigo-500/30 relative isolate">
+      <AnimatedBackground />
+
       {/* Header */}
       <header className="sticky top-0 z-50 bg-[#030712]/70 backdrop-blur-xl border-b border-white/[0.06]">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center justify-between">
@@ -845,10 +1062,13 @@ export default function CineFinder() {
               </div>
 
               {!userData ? (
-                <LoadingSpinner />
+                <SkeletonGrid />
               ) : userData.personalized_recommendations?.length ? (
                 <motion.div
                   layout
+                  variants={staggerContainer}
+                  initial="hidden"
+                  animate="show"
                   className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
                 >
                   {userData.personalized_recommendations.map((m) => (
@@ -1103,29 +1323,22 @@ export default function CineFinder() {
               {isBlending ? (
                 <LoadingSpinner />
               ) : (
-                comboResults.length > 0 && (
-                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                    <h3 className="text-lg font-bold text-white mb-4">
-                      Blended Results
-                    </h3>
-                    <motion.div
-                      layout
-                      className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4"
-                    >
-                      {comboResults.map((m) => (
-                        <MovieCard
-                          key={m.tmdb_id}
-                          movie={m}
-                          actionLabel="Add to Watchlist"
-                          actionIcon={CheckCircle2}
-                          matchScore={m.score}
-                          onAction={() => handleRate(m.tmdb_id, 5)}
-                          onCardClick={() => openMovieDetails(m.tmdb_id)}
-                        />
-                      ))}
-                    </motion.div>
-                  </motion.div>
-                )
+                <div className="space-y-12">
+                  <RecommendationSection
+                    title="Keyword Matches"
+                    subtitle="Recommended by TMDB keyword similarity alone."
+                    results={keywordResults}
+                    onAction={(id) => handleRate(id, 5)}
+                    onCardClick={openMovieDetails}
+                  />
+                  <RecommendationSection
+                    title="Hybrid Matches"
+                    subtitle="Recommended by keywords, genres, and ratings/popularity."
+                    results={hybridResults}
+                    onAction={(id) => handleRate(id, 5)}
+                    onCardClick={openMovieDetails}
+                  />
+                </div>
               )}
             </motion.div>
           )}
@@ -1373,7 +1586,7 @@ export default function CineFinder() {
                         <span className="text-xs text-slate-400">
                           Showing{" "}
                           <strong className="text-white">
-                            {filteredAndSortedRatings.length}
+                            <CountUp value={filteredAndSortedRatings.length} />
                           </strong>{" "}
                           of{" "}
                           <strong className="text-white">
@@ -1406,7 +1619,7 @@ export default function CineFinder() {
               </AnimatePresence>
 
               {!userData ? (
-                <LoadingSpinner />
+                <SkeletonGrid />
               ) : filteredAndSortedRatings.length > 0 ? (
                 <motion.div
                   layout
@@ -1490,13 +1703,17 @@ export default function CineFinder() {
                       className="w-full bg-[#030712] border border-white/10 text-white rounded-xl px-4 py-2.5 text-sm outline-none focus:border-indigo-500/50 transition-colors"
                     />
                   </div>
-                  <button
+                  <motion.button
                     type="button"
-                    onClick={() => setUpdateMessage("Updated successfully!")}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => {
+                      setUpdateMessage("Updated successfully!");
+                      pushToast("Profile updated", "success");
+                    }}
                     className="w-full bg-indigo-600 text-white font-semibold text-xs rounded-xl py-3 hover:bg-indigo-500 transition-colors shadow-lg shadow-indigo-600/20"
                   >
                     Save Changes
-                  </button>
+                  </motion.button>
                   {updateMessage && (
                     <p className="text-emerald-400 text-xs text-center mt-2 font-medium">
                       {updateMessage}
@@ -1591,11 +1808,79 @@ export default function CineFinder() {
                       "No synopsis available for this title."}
                   </p>
                 </div>
+
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <Star size={14} className="text-amber-400" /> Your Rating
+                  </h3>
+                  {isInWatchlist(selectedMovie.tmdb_id) ? (
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <motion.button
+                            key={star}
+                            whileHover={{ scale: 1.2 }}
+                            whileTap={{ scale: 0.85 }}
+                            onClick={() => handleRate(selectedMovie.tmdb_id, star)}
+                            disabled={isUpdating}
+                            className={`transition-colors disabled:opacity-50 ${
+                              selectedRating >= star
+                                ? "text-amber-400 drop-shadow-[0_0_10px_rgba(251,191,36,0.5)]"
+                                : "text-slate-700 hover:text-amber-400/50"
+                            }`}
+                            title={`${star} stars`}
+                          >
+                            <Star
+                              size={22}
+                              fill={selectedRating >= star ? "currentColor" : "none"}
+                            />
+                          </motion.button>
+                        ))}
+                      </div>
+                      <motion.span
+                        key={selectedRating}
+                        initial={{ scale: 0.7, opacity: 0.4 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        transition={{ type: "spring", stiffness: 500, damping: 18 }}
+                        className="text-sm font-bold text-amber-400"
+                      >
+                        {selectedRating.toFixed(1)}
+                      </motion.span>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-slate-500">
+                      Add this movie to your watchlist to give it a rating.
+                    </p>
+                  )}
+                </div>
               </div>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+
+      {/* Toast notifications */}
+      <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-2 pointer-events-none">
+        <AnimatePresence>
+          {toasts.map((toast) => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 16, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+              className="pointer-events-auto flex items-center gap-2 bg-[#090D16]/95 border border-white/10 backdrop-blur-xl text-xs font-semibold text-slate-200 rounded-xl pl-3 pr-4 py-2.5 shadow-2xl max-w-xs"
+            >
+              {toast.tone === "success" ? (
+                <CheckCircle2 size={14} className="text-emerald-400 shrink-0" />
+              ) : (
+                <Info size={14} className="text-indigo-400 shrink-0" />
+              )}
+              <span className="leading-snug">{toast.message}</span>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

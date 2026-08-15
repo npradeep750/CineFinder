@@ -1,5 +1,6 @@
 import os
 import json
+import time
 from typing import List, Dict, Optional
 from contextlib import asynccontextmanager
 import numpy as np
@@ -18,14 +19,33 @@ SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 TMDB_API_KEY = "901696f09bee18449863e03f2da050e0"
 TMDB_BASE_URL = "https://api.themoviedb.org/3"
 
+# Catalog + recommendation configuration
+CATALOG_PAGES = 150         # ~3,000 movies; niche films like Paprika need ~110 pages
+TMDB_FETCH_THREADS = 8
+RECOMMENDATION_LIMIT = 20   # results returned per recommendation mode
+CATALOG_CACHE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "catalog_cache.json"
+)
+CATALOG_CACHE_DAYS = 7      # rebuild the on-disk catalog when older than this
+
+TMDB_GENRES = {
+    28: "action", 12: "adventure", 16: "animation", 35: "comedy",
+    80: "crime", 99: "documentary", 18: "drama", 10751: "family",
+    14: "fantasy", 36: "history", 27: "horror", 10402: "music",
+    9648: "mystery", 10749: "romance", 878: "scifi", 10770: "tvmovie",
+    53: "thriller", 10752: "war", 37: "western",
+}
+
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 CATALOG_CACHE = {
     "movies_list": [],
     "id_to_movie": {},
     "id_to_idx": {},
-    "tfidf_vectorizer": None,
-    "tfidf_matrix": None
+    "keyword_vectorizer": None,
+    "keyword_matrix": None,
+    "hybrid_vectorizer": None,
+    "hybrid_matrix": None,
 }
 
 RATING_WEIGHTS = {
@@ -34,80 +54,206 @@ RATING_WEIGHTS = {
 }
 
 def fetch_movie_keywords(tmdb_id: int) -> str:
-    """Fetches specific keywords from TMDB and joins them into a single string."""
+    """Fetches TMDB keywords for one movie and joins them into a single string."""
     url = f"{TMDB_BASE_URL}/movie/{tmdb_id}/keywords?api_key={TMDB_API_KEY}"
-    try:
-        res = requests.get(url, timeout=3)
-        if res.status_code == 200:
-            keywords = [k["name"].replace(" ", "") for k in res.json().get("keywords", [])]
-            return " ".join(keywords)
-    except Exception:
-        pass
+    for attempt in range(3):
+        try:
+            res = requests.get(url, timeout=3)
+            if res.status_code == 200:
+                keywords = [k["name"].replace(" ", "") for k in res.json().get("keywords", [])]
+                return " ".join(keywords)
+            if res.status_code == 429:  # rate limited -> back off and retry
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            return ""
+        except Exception:
+            time.sleep(0.3 * (attempt + 1))
     return ""
 
-def load_catalog_and_build_vectors():
-    print("🔄 Fetching popular movies from TMDB...")
-    all_data = []
-    seen_titles = set()
-    
-    for page in range(1, 51):
-        try:
-            res = requests.get(f"{TMDB_BASE_URL}/movie/popular?api_key={TMDB_API_KEY}&page={page}", timeout=5)
-            if res.status_code == 200:
-                for m in res.json().get("results", []):
-                    title = m["title"]
-                    normalized_title = title.strip().lower()
-                    
-                    if normalized_title in seen_titles:
-                        continue
-                    
-                    seen_titles.add(normalized_title)
-                    all_data.append({
-                        "tmdb_id": m["id"],
-                        "title": title,
-                        "poster_path": m.get("poster_path") or ""
-                    })
-        except Exception:
-            continue
 
-    print("🚀 Fetching specific TMDB Keywords for all movies in parallel...")
-    with ThreadPoolExecutor(max_workers=15) as executor:
-        keyword_results = list(executor.map(fetch_movie_keywords, [m["tmdb_id"] for m in all_data]))
+def fetch_discover_page(page: int) -> List[dict]:
+    """Fetch one page of TMDB's discover endpoint (popularity-sorted)."""
+    url = (
+        f"{TMDB_BASE_URL}/discover/movie"
+        f"?api_key={TMDB_API_KEY}"
+        f"&sort_by=popularity.desc"
+        f"&include_adult=false"
+        f"&language=en-US"
+        f"&vote_count.gte=50"
+        f"&page={page}"
+    )
+    for attempt in range(3):
+        try:
+            res = requests.get(url, timeout=5)
+            if res.status_code == 200:
+                return res.json().get("results", [])
+            if res.status_code == 429:  # rate limited -> back off and retry
+                time.sleep(1.5 * (attempt + 1))
+                continue
+            return []
+        except Exception:
+            time.sleep(0.3 * (attempt + 1))
+    return []
+
+
+def rating_token(vote_average) -> str:
+    """Bucket a 0-10 TMDB rating into a comparable token (r0..r9)."""
+    try:
+        v = float(vote_average)
+        if v <= 0:
+            return ""
+        return f"r{min(9, max(0, int(round(v))))}"
+    except (TypeError, ValueError):
+        return ""
+
+
+def popularity_token(popularity) -> str:
+    """Bucket TMDB popularity into a comparable token (pop0..pop5)."""
+    try:
+        p = float(popularity)
+        if p >= 1000: return "pop5"
+        if p >= 300: return "pop4"
+        if p >= 100: return "pop3"
+        if p >= 30: return "pop2"
+        if p >= 10: return "pop1"
+        return "pop0"
+    except (TypeError, ValueError):
+        return ""
+
+
+def build_keyword_feature(keywords: str) -> str:
+    return (keywords or "").strip()
+
+
+def build_hybrid_feature(
+    keywords: str, genres: str, rating_tok: str, popularity_tok: str
+) -> str:
+    parts: List[str] = []
+    if keywords:
+        parts.append((keywords + " ") * 3)
+    if genres:
+        parts.append((genres + " ") * 2)
+    if rating_tok:
+        parts.append(rating_tok)
+    if popularity_tok:
+        parts.append(popularity_tok)
+    return " ".join(parts)
+
+
+def _fetch_catalog_rows() -> List[dict]:
+    print(f"🔄 Fetching up to {CATALOG_PAGES * 20:,} movies from TMDB discover...")
+    pages = list(range(1, CATALOG_PAGES + 1))
+    with ThreadPoolExecutor(max_workers=TMDB_FETCH_THREADS) as executor:
+        page_results = list(executor.map(fetch_discover_page, pages))
+
+    seen_ids: set = set()
+    seen_titles: set = set()
+    rows: List[dict] = []
+
+    for results in page_results:
+        for m in results:
+            tmdb_id = m.get("id")
+            title = (m.get("title") or "").strip()
+            if not tmdb_id or not title or tmdb_id in seen_ids:
+                continue
+            seen_ids.add(tmdb_id)
+            if title.lower() in seen_titles:
+                continue
+            seen_titles.add(title.lower())
+
+            genres = " ".join(
+                TMDB_GENRES.get(gid, "") for gid in m.get("genre_ids", [])
+            )
+            rows.append({
+                "tmdb_id": tmdb_id,
+                "title": title,
+                "poster_path": m.get("poster_path") or "",
+                "genres": genres,
+                "vote_average": m.get("vote_average") or 0,
+                "popularity": m.get("popularity") or 0,
+            })
+
+    print(f"🚀 Fetching TMDB keywords for {len(rows)} movies...")
+    with ThreadPoolExecutor(max_workers=TMDB_FETCH_THREADS) as executor:
+        keyword_results = list(
+            executor.map(fetch_movie_keywords, [r["tmdb_id"] for r in rows])
+        )
+    for row, kw in zip(rows, keyword_results):
+        row["keywords"] = kw
+
+    # Keyword-only similarity needs a non-empty keyword vector for every row.
+    rows = [r for r in rows if (r["keywords"] or "").strip()]
+    return rows
+
+
+def _save_catalog_rows(rows: List[dict]) -> None:
+    try:
+        with open(CATALOG_CACHE_FILE, "w", encoding="utf-8") as f:
+            json.dump(rows, f)
+        print(f"💾 Cached {len(rows):,} movies to disk.")
+    except OSError as e:
+        print(f"⚠️ Could not cache catalog: {e}")
+
+
+def load_catalog_and_build_vectors():
+    force_rebuild = os.environ.get("FORCE_REBUILD_CATALOG") == "1"
+    rows = None
+
+    if not force_rebuild and os.path.exists(CATALOG_CACHE_FILE):
+        age_seconds = time.time() - os.path.getmtime(CATALOG_CACHE_FILE)
+        if age_seconds < CATALOG_CACHE_DAYS * 86400:
+            try:
+                with open(CATALOG_CACHE_FILE, "r", encoding="utf-8") as f:
+                    rows = json.load(f)
+                print(f"📦 Loaded {len(rows):,} movies from catalog cache.")
+            except (OSError, json.JSONDecodeError):
+                rows = None
+
+    if rows is None:
+        rows = _fetch_catalog_rows()
+        _save_catalog_rows(rows)
 
     movies_list = []
     id_to_movie = {}
     id_to_idx = {}
-    feature_texts = []
+    keyword_texts = []
+    hybrid_texts = []
 
-    for idx, row in enumerate(all_data):
-        tmdb_id = row["tmdb_id"]
-        title = row["title"]
-        poster_path = row["poster_path"]
-        keywords_str = keyword_results[idx]
-
-        rich_feature_string = f"{(title.replace(' ', '') + ' ') * 2} {(keywords_str + ' ') * 5}"
-
+    for row in rows:
         movie_obj = {
-            "tmdb_id": tmdb_id,
-            "title": title,
-            "poster_path": poster_path
+            "tmdb_id": row["tmdb_id"],
+            "title": row["title"],
+            "poster_path": row["poster_path"],
         }
-
         movies_list.append(movie_obj)
-        id_to_movie[tmdb_id] = movie_obj
-        id_to_idx[tmdb_id] = len(movies_list) - 1
-        feature_texts.append(rich_feature_string)
+        id_to_movie[row["tmdb_id"]] = movie_obj
+        id_to_idx[row["tmdb_id"]] = len(movies_list) - 1
 
-    print("⚡ Building TF-IDF Matrix based on Keywords...")
-    tfidf = TfidfVectorizer(stop_words='english', sublinear_tf=True)
-    tfidf_matrix = tfidf.fit_transform(feature_texts)
+        keyword_texts.append(build_keyword_feature(row["keywords"]))
+        hybrid_texts.append(
+            build_hybrid_feature(
+                row["keywords"],
+                row["genres"],
+                rating_token(row["vote_average"]),
+                popularity_token(row["popularity"]),
+            )
+        )
+
+    print("⚡ Building keyword-only and hybrid TF-IDF matrices...")
+    keyword_vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
+    keyword_matrix = keyword_vectorizer.fit_transform(keyword_texts)
+
+    hybrid_vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
+    hybrid_matrix = hybrid_vectorizer.fit_transform(hybrid_texts)
 
     CATALOG_CACHE["movies_list"] = movies_list
     CATALOG_CACHE["id_to_movie"] = id_to_movie
     CATALOG_CACHE["id_to_idx"] = id_to_idx
-    CATALOG_CACHE["tfidf_vectorizer"] = tfidf
-    CATALOG_CACHE["tfidf_matrix"] = tfidf_matrix
-    print(f"✅ Successfully indexed {len(movies_list)} movies.")
+    CATALOG_CACHE["keyword_vectorizer"] = keyword_vectorizer
+    CATALOG_CACHE["keyword_matrix"] = keyword_matrix
+    CATALOG_CACHE["hybrid_vectorizer"] = hybrid_vectorizer
+    CATALOG_CACHE["hybrid_matrix"] = hybrid_matrix
+    print(f"✅ Indexed {len(movies_list):,} movies for two recommendation modes.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -262,7 +408,7 @@ def get_user_history(user_id: str = Depends(get_current_user_id)):
 
     personalized_recommendations = []
     movies_list = CATALOG_CACHE["movies_list"]
-    tfidf_matrix = CATALOG_CACHE["tfidf_matrix"]
+    tfidf_matrix = CATALOG_CACHE["hybrid_matrix"]
     id_to_idx = CATALOG_CACHE["id_to_idx"]
 
     if tfidf_matrix is not None and user_ratings:
@@ -379,60 +525,88 @@ def unwatch_movie(body: WatchRequest, user_id: str = Depends(get_current_user_id
         raise HTTPException(status_code=500, detail=f"Unwatch failed: {str(e)}")
 
 @app.post("/api/recommend")
-def get_hybrid_recommendations(body: RecommendRequest):
+def get_recommendations(body: RecommendRequest):
     if not body.tmdb_ids:
         raise HTTPException(status_code=400, detail="No movies selected.")
 
     movies_list = CATALOG_CACHE["movies_list"]
-    tfidf_matrix = CATALOG_CACHE["tfidf_matrix"]
+    id_to_movie = CATALOG_CACHE["id_to_movie"]
     id_to_idx = CATALOG_CACHE["id_to_idx"]
-    vectorizer = CATALOG_CACHE["tfidf_vectorizer"]
+    keyword_vectorizer = CATALOG_CACHE["keyword_vectorizer"]
+    keyword_matrix = CATALOG_CACHE["keyword_matrix"]
+    hybrid_vectorizer = CATALOG_CACHE["hybrid_vectorizer"]
+    hybrid_matrix = CATALOG_CACHE["hybrid_matrix"]
 
-    matched_vectors = []
+    keyword_vectors = []
+    hybrid_vectors = []
     selected_titles = set()
 
     for t_id in body.tmdb_ids:
         if t_id in id_to_idx:
-            m_idx = id_to_idx[t_id]
-            matched_vectors.append(tfidf_matrix[m_idx].toarray()[0])
-            selected_titles.add(CATALOG_CACHE["id_to_movie"][t_id]["title"].strip().lower())
+            idx = id_to_idx[t_id]
+            keyword_vectors.append(keyword_matrix[idx].toarray()[0])
+            hybrid_vectors.append(hybrid_matrix[idx].toarray()[0])
+            selected_titles.add(id_to_movie[t_id]["title"].strip().lower())
         else:
             try:
-                details_res = requests.get(f"{TMDB_BASE_URL}/movie/{t_id}?api_key={TMDB_API_KEY}", timeout=3)
+                details_res = requests.get(
+                    f"{TMDB_BASE_URL}/movie/{t_id}?api_key={TMDB_API_KEY}",
+                    timeout=3,
+                )
                 if details_res.status_code == 200:
-                    title = details_res.json().get("title", "")
+                    details = details_res.json()
+                    title = details.get("title", "")
                     keywords_str = fetch_movie_keywords(t_id)
-                    rich_feature_string = f"{(title.replace(' ', '') + ' ') * 2} {(keywords_str + ' ') * 5}"
-                    dynamic_vector = vectorizer.transform([rich_feature_string]).toarray()[0]
-                    matched_vectors.append(dynamic_vector)
+                    genres = " ".join(
+                        TMDB_GENRES.get(g.get("id"), "")
+                        for g in details.get("genres", [])
+                    )
+                    rtok = rating_token(details.get("vote_average"))
+                    ptok = popularity_token(details.get("popularity"))
+
+                    if keywords_str.strip():
+                        keyword_vectors.append(
+                            keyword_vectorizer.transform(
+                                [build_keyword_feature(keywords_str)]
+                            ).toarray()[0]
+                        )
+                    hybrid_vectors.append(
+                        hybrid_vectorizer.transform(
+                            [build_hybrid_feature(keywords_str, genres, rtok, ptok)]
+                        ).toarray()[0]
+                    )
                     if title:
                         selected_titles.add(title.strip().lower())
             except Exception as e:
                 print(f"Failed to fetch missing movie {t_id}: {e}")
                 continue
 
-    if not matched_vectors:
+    if not keyword_vectors and not hybrid_vectors:
         raise HTTPException(status_code=404, detail="Could not process any of the selected movies.")
 
-    blended_vector = np.mean(matched_vectors, axis=0).reshape(1, -1)
-    sim_scores = cosine_similarity(blended_vector, tfidf_matrix)[0]
+    def rank(vectors, matrix):
+        if not vectors or matrix is None:
+            return []
+        blended = np.mean(vectors, axis=0).reshape(1, -1)
+        sims = cosine_similarity(blended, matrix)[0]
+        scored = sorted(zip(movies_list, sims), key=lambda x: x[1], reverse=True)
+        results = []
+        seen = set(selected_titles)
+        for m, s in scored:
+            norm_title = m["title"].strip().lower()
+            if m["tmdb_id"] not in body.tmdb_ids and norm_title not in seen:
+                seen.add(norm_title)
+                results.append({
+                    "tmdb_id": m["tmdb_id"],
+                    "title": m["title"],
+                    "poster_path": m.get("poster_path") or "",
+                    "score": round(float(s), 4),
+                })
+                if len(results) == RECOMMENDATION_LIMIT:
+                    break
+        return results
 
-    scored = sorted(zip(movies_list, sim_scores), key=lambda x: x[1], reverse=True)
-    
-    results = []
-    seen_titles = set(selected_titles)
-    
-    for m, s in scored:
-        norm_title = m["title"].strip().lower()
-        if m["tmdb_id"] not in body.tmdb_ids and norm_title not in seen_titles:
-            seen_titles.add(norm_title)
-            results.append({
-                "tmdb_id": m["tmdb_id"],
-                "title": m["title"],
-                "poster_path": m.get("poster_path") or "",
-                "score": round(float(s), 4)
-            })
-            if len(results) == 20:
-                break
-
-    return {"recommendations": results}
+    return {
+        "keyword_recommendations": rank(keyword_vectors, keyword_matrix),
+        "hybrid_recommendations": rank(hybrid_vectors, hybrid_matrix),
+    }
