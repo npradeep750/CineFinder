@@ -22,7 +22,7 @@ TMDB_BASE_URL = "https://api.themoviedb.org/3"
 # Catalog + recommendation configuration
 CATALOG_PAGES = 150         # ~3,000 movies; niche films like Paprika need ~110 pages
 TMDB_FETCH_THREADS = 8
-RECOMMENDATION_LIMIT = 20   # results returned per recommendation mode
+RECOMMENDATION_LIMIT = 100  # results returned per recommendation mode (frontend pages 20 at a time)
 CATALOG_CACHE_FILE = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "catalog_cache.json"
 )
@@ -42,15 +42,13 @@ CATALOG_CACHE = {
     "movies_list": [],
     "id_to_movie": {},
     "id_to_idx": {},
-    "keyword_vectorizer": None,
-    "keyword_matrix": None,
     "hybrid_vectorizer": None,
     "hybrid_matrix": None,
 }
 
 RATING_WEIGHTS = {
-    5.0: 8.0, 4.5: 4.0, 4.0: 2.0, 3.5: 1.5, 3.0: 1.0,
-    2.5: 0.5, 2.0: -0.5, 1.5: -1.0, 1.0: -2.0, 0.5: -4.0,
+    5.0: 12.0, 4.5: 6.0, 4.0: 2.0, 3.5: 1.5, 3.0: 1.0,
+    2.5: 0.5, 2.0: -1.0, 1.5: -2.0, 1.0: -4.0, 0.5: -8.0,
 }
 
 def fetch_movie_keywords(tmdb_id: int) -> str:
@@ -121,10 +119,6 @@ def popularity_token(popularity) -> str:
         return ""
 
 
-def build_keyword_feature(keywords: str) -> str:
-    return (keywords or "").strip()
-
-
 def build_hybrid_feature(
     keywords: str, genres: str, rating_tok: str, popularity_tok: str
 ) -> str:
@@ -138,6 +132,39 @@ def build_hybrid_feature(
     if popularity_tok:
         parts.append(popularity_tok)
     return " ".join(parts)
+
+
+def get_username(user_id: str) -> str:
+    """Resolve a user's display name from the profiles table."""
+    try:
+        profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
+        if profile_res.data and profile_res.data[0].get("username"):
+            return profile_res.data[0]["username"]
+    except Exception:
+        pass
+    return "User"
+
+
+def resolve_movie_metadata(tmdb_id: int, title: str = "", poster_path: str = "") -> tuple:
+    """Ensure a non-empty title + poster for a movie, falling back to the catalog or TMDB."""
+    if not title or not poster_path:
+        info = CATALOG_CACHE.get("id_to_movie", {}).get(tmdb_id)
+        if info:
+            title = title or info.get("title") or ""
+            poster_path = poster_path or info.get("poster_path") or ""
+    if not title or not poster_path:
+        try:
+            res = requests.get(
+                f"{TMDB_BASE_URL}/movie/{tmdb_id}?api_key={TMDB_API_KEY}",
+                timeout=3,
+            )
+            if res.status_code == 200:
+                d = res.json()
+                title = title or d.get("title") or ""
+                poster_path = poster_path or d.get("poster_path") or ""
+        except Exception:
+            pass
+    return title or f"Movie #{tmdb_id}", poster_path
 
 
 def _fetch_catalog_rows() -> List[dict]:
@@ -181,8 +208,6 @@ def _fetch_catalog_rows() -> List[dict]:
     for row, kw in zip(rows, keyword_results):
         row["keywords"] = kw
 
-    # Keyword-only similarity needs a non-empty keyword vector for every row.
-    rows = [r for r in rows if (r["keywords"] or "").strip()]
     return rows
 
 
@@ -216,7 +241,6 @@ def load_catalog_and_build_vectors():
     movies_list = []
     id_to_movie = {}
     id_to_idx = {}
-    keyword_texts = []
     hybrid_texts = []
 
     for row in rows:
@@ -229,7 +253,6 @@ def load_catalog_and_build_vectors():
         id_to_movie[row["tmdb_id"]] = movie_obj
         id_to_idx[row["tmdb_id"]] = len(movies_list) - 1
 
-        keyword_texts.append(build_keyword_feature(row["keywords"]))
         hybrid_texts.append(
             build_hybrid_feature(
                 row["keywords"],
@@ -239,21 +262,16 @@ def load_catalog_and_build_vectors():
             )
         )
 
-    print("⚡ Building keyword-only and hybrid TF-IDF matrices...")
-    keyword_vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
-    keyword_matrix = keyword_vectorizer.fit_transform(keyword_texts)
-
+    print("⚡ Building hybrid TF-IDF matrix...")
     hybrid_vectorizer = TfidfVectorizer(stop_words="english", sublinear_tf=True)
     hybrid_matrix = hybrid_vectorizer.fit_transform(hybrid_texts)
 
     CATALOG_CACHE["movies_list"] = movies_list
     CATALOG_CACHE["id_to_movie"] = id_to_movie
     CATALOG_CACHE["id_to_idx"] = id_to_idx
-    CATALOG_CACHE["keyword_vectorizer"] = keyword_vectorizer
-    CATALOG_CACHE["keyword_matrix"] = keyword_matrix
     CATALOG_CACHE["hybrid_vectorizer"] = hybrid_vectorizer
     CATALOG_CACHE["hybrid_matrix"] = hybrid_matrix
-    print(f"✅ Indexed {len(movies_list):,} movies for two recommendation modes.")
+    print(f"✅ Indexed {len(movies_list):,} movies for hybrid recommendations.")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -271,18 +289,52 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-def get_current_user_id(authorization: str = Header(None)) -> str:
+def get_current_user(authorization: str = Header(None)):
+    """Resolve the full Supabase auth user from the bearer token."""
     if not authorization or not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Session token missing.")
-    
+
     token = authorization.split(" ")[1]
     try:
         user_response = supabase.auth.get_user(token)
         if not user_response or not user_response.user:
             raise HTTPException(status_code=401, detail="Invalid session token.")
-        return user_response.user.id
+        return user_response.user
     except Exception as e:
         raise HTTPException(status_code=401, detail=f"Auth error: {str(e)}")
+
+
+def get_current_user_id(authorization: str = Header(None)) -> str:
+    return get_current_user(authorization).id
+
+
+def ensure_profile(user) -> str:
+    """Return the user's display name, creating a profile row if missing (e.g. OAuth sign-ins)."""
+    user_id = user.id
+    try:
+        profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
+        if profile_res.data and profile_res.data[0].get("username"):
+            return profile_res.data[0]["username"]
+    except Exception:
+        pass
+
+    # No profile row yet (Google / OAuth user) — derive a username from metadata or email.
+    meta = getattr(user, "user_metadata", None) or {}
+    email = getattr(user, "email", "") or ""
+    fallback = (
+        meta.get("full_name")
+        or meta.get("name")
+        or meta.get("user_name")
+        or (email.split("@")[0] if email else "")
+        or "Movie Fan"
+    )
+    try:
+        supabase.table("profiles").upsert(
+            {"id": user_id, "username": fallback}, on_conflict="id"
+        ).execute()
+    except Exception:
+        pass
+    return fallback
 
 class RatingRequest(BaseModel):
     tmdb_id: int
@@ -362,9 +414,9 @@ def delete_recent_search(body: SearchDeleteRequest, user_id: str = Depends(get_c
         return {"message": "Failed to delete"}
 
 @app.get("/api/user-history")
-def get_user_history(user_id: str = Depends(get_current_user_id)):
-    profile_res = supabase.table("profiles").select("username").eq("id", user_id).execute()
-    username = profile_res.data[0].get("username") if profile_res.data else "User"
+def get_user_history(user=Depends(get_current_user)):
+    user_id = user.id
+    username = ensure_profile(user)
 
     # Select created_at timestamptz from user_watches to support sorting by recently added
     watches_res = supabase.table("user_watches").select("tmdb_id, movie, poster_path, created_at").eq("user_id", user_id).execute()
@@ -468,11 +520,18 @@ def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id))
         if body.rating == 0:
             supabase.table("user_ratings").delete().eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
         else:
-            payload = {"user_id": user_id, "tmdb_id": body.tmdb_id, "rating": body.rating}
-            if body.title:
-                payload["movie"] = body.title
-            if body.poster_path:
-                payload["poster_path"] = body.poster_path
+            title, poster_path = resolve_movie_metadata(
+                body.tmdb_id, body.title or "", body.poster_path or ""
+            )
+
+            payload = {
+                "user_id": user_id,
+                "tmdb_id": body.tmdb_id,
+                "rating": body.rating,
+                "movie": title,
+            }
+            if poster_path:
+                payload["poster_path"] = poster_path
 
             existing_rating = supabase.table("user_ratings").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
             if existing_rating.data:
@@ -480,11 +539,14 @@ def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id))
             else:
                 supabase.table("user_ratings").insert(payload).execute()
 
-            watch_payload = {"user_id": user_id, "tmdb_id": body.tmdb_id}
-            if body.title:
-                watch_payload["movie"] = body.title
-            if body.poster_path:
-                watch_payload["poster_path"] = body.poster_path
+            watch_payload = {
+                "user_id": user_id,
+                "tmdb_id": body.tmdb_id,
+                "movie": title,
+                "username": get_username(user_id),
+            }
+            if poster_path:
+                watch_payload["poster_path"] = poster_path
 
             existing_watch = supabase.table("user_watches").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
             if existing_watch.data:
@@ -499,11 +561,17 @@ def rate_movie(body: RatingRequest, user_id: str = Depends(get_current_user_id))
 @app.post("/api/watch")
 def mark_movie_as_watched(body: WatchRequest, user_id: str = Depends(get_current_user_id)):
     try:
-        payload = {"user_id": user_id, "tmdb_id": body.tmdb_id}
-        if body.title:
-            payload["movie"] = body.title
-        if body.poster_path:
-            payload["poster_path"] = body.poster_path
+        title, poster_path = resolve_movie_metadata(
+            body.tmdb_id, body.title or "", body.poster_path or ""
+        )
+        payload = {
+            "user_id": user_id,
+            "tmdb_id": body.tmdb_id,
+            "movie": title,
+            "username": get_username(user_id),
+        }
+        if poster_path:
+            payload["poster_path"] = poster_path
 
         existing_watch = supabase.table("user_watches").select("id").eq("user_id", user_id).eq("tmdb_id", body.tmdb_id).execute()
         if existing_watch.data:
@@ -532,19 +600,15 @@ def get_recommendations(body: RecommendRequest):
     movies_list = CATALOG_CACHE["movies_list"]
     id_to_movie = CATALOG_CACHE["id_to_movie"]
     id_to_idx = CATALOG_CACHE["id_to_idx"]
-    keyword_vectorizer = CATALOG_CACHE["keyword_vectorizer"]
-    keyword_matrix = CATALOG_CACHE["keyword_matrix"]
     hybrid_vectorizer = CATALOG_CACHE["hybrid_vectorizer"]
     hybrid_matrix = CATALOG_CACHE["hybrid_matrix"]
 
-    keyword_vectors = []
     hybrid_vectors = []
     selected_titles = set()
 
     for t_id in body.tmdb_ids:
         if t_id in id_to_idx:
             idx = id_to_idx[t_id]
-            keyword_vectors.append(keyword_matrix[idx].toarray()[0])
             hybrid_vectors.append(hybrid_matrix[idx].toarray()[0])
             selected_titles.add(id_to_movie[t_id]["title"].strip().lower())
         else:
@@ -564,12 +628,6 @@ def get_recommendations(body: RecommendRequest):
                     rtok = rating_token(details.get("vote_average"))
                     ptok = popularity_token(details.get("popularity"))
 
-                    if keywords_str.strip():
-                        keyword_vectors.append(
-                            keyword_vectorizer.transform(
-                                [build_keyword_feature(keywords_str)]
-                            ).toarray()[0]
-                        )
                     hybrid_vectors.append(
                         hybrid_vectorizer.transform(
                             [build_hybrid_feature(keywords_str, genres, rtok, ptok)]
@@ -581,7 +639,7 @@ def get_recommendations(body: RecommendRequest):
                 print(f"Failed to fetch missing movie {t_id}: {e}")
                 continue
 
-    if not keyword_vectors and not hybrid_vectors:
+    if not hybrid_vectors:
         raise HTTPException(status_code=404, detail="Could not process any of the selected movies.")
 
     def rank(vectors, matrix):
@@ -607,6 +665,5 @@ def get_recommendations(body: RecommendRequest):
         return results
 
     return {
-        "keyword_recommendations": rank(keyword_vectors, keyword_matrix),
-        "hybrid_recommendations": rank(hybrid_vectors, hybrid_matrix),
+        "recommendations": rank(hybrid_vectors, hybrid_matrix),
     }
