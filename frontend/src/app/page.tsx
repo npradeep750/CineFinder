@@ -1031,6 +1031,31 @@ function StarRating({
   );
 }
 
+// Google's "G" logo, used on the login screen and the settings
+// "Connect Google" control.
+function GoogleIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 48 48" aria-hidden="true">
+      <path
+        fill="#FFC107"
+        d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.1 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"
+      />
+      <path
+        fill="#FF3D00"
+        d="M6.3 14.7l6.6 4.8C14.7 15.1 18.9 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
+      />
+      <path
+        fill="#4CAF50"
+        d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"
+      />
+      <path
+        fill="#1976D2"
+        d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"
+      />
+    </svg>
+  );
+}
+
 export default function CineFinder() {
   const [session, setSession] = useState<any>(null);
   const [userData, setUserData] = useState<UserHistory | null>(null);
@@ -1603,6 +1628,32 @@ export default function CineFinder() {
     }
   };
 
+  // --- Settings: link a previously existing account to Google ---
+  // Uses Supabase's linkIdentity: while signed in with email/password, this
+  // runs the Google OAuth flow and attaches the Google identity to the
+  // current user, so they can sign in with Google from then on.
+  const handleLinkGoogle = async () => {
+    setAuthLoading(true);
+    setSettingsMsg(null);
+    try {
+      const { error } = await supabase.auth.linkIdentity({
+        provider: "google",
+        options: { redirectTo: window.location.origin },
+      });
+      if (error) throw error;
+      // OAuth redirects away to Google's consent page and back with the
+      // newly-linked identity; if it returns here (popup mode) we stop.
+      setAuthLoading(false);
+      pushToast("Google connected", "success");
+    } catch (err: any) {
+      setSettingsMsg({
+        text: err.message || "Could not connect Google.",
+        tone: "error",
+      });
+      setAuthLoading(false);
+    }
+  };
+
   // --- Settings: update username ---
   const handleSaveUsername = async () => {
     if (!session?.user?.id || !newUsername.trim()) return;
@@ -1627,6 +1678,11 @@ export default function CineFinder() {
       setUsernameSaving(false);
     }
   };
+
+  // True when the current user already has a Google identity linked
+  const hasGoogleLinked = !!session?.user?.identities?.some(
+    (i: any) => i.provider === "google",
+  );
 
   // --- Settings: change password ---
   const handleChangePassword = async () => {
@@ -1789,29 +1845,7 @@ export default function CineFinder() {
               disabled={authLoading}
               className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-sm rounded-xl py-3 transition-all disabled:opacity-60 shadow-[0_10px_28px_rgba(255,255,255,0.12)]"
             >
-              <svg
-                width="18"
-                height="18"
-                viewBox="0 0 48 48"
-                aria-hidden="true"
-              >
-                <path
-                  fill="#FFC107"
-                  d="M43.6 20.1H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.1 6.1 29.3 4 24 4 13 4 4 13 4 24s9 20 20 20 20-9 20-20c0-1.3-.1-2.6-.4-3.9z"
-                />
-                <path
-                  fill="#FF3D00"
-                  d="M6.3 14.7l6.6 4.8C14.7 15.1 18.9 12 24 12c3.1 0 5.9 1.2 8 3l5.7-5.7C34.1 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"
-                />
-                <path
-                  fill="#4CAF50"
-                  d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"
-                />
-                <path
-                  fill="#1976D2"
-                  d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"
-                />
-              </svg>
+              <GoogleIcon size={18} />
               Continue with Google
             </button>
 
@@ -3342,6 +3376,73 @@ export default function CineFinder() {
                           {passwordLoading ? "Updating…" : "Update password"}
                         </motion.button>
                       </div>
+                    </motion.section>
+
+                    {/* --- Sign-in methods --- */}
+                    <motion.section
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.15 }}
+                      className="clap-board relative rounded-3xl border border-white/[0.08] p-6 backdrop-blur-xl shadow-[0_16px_45px_rgba(2,6,23,0.3)]"
+                    >
+                      <span className="clap-corner clap-corner-tl" />
+                      <span className="clap-corner clap-corner-tr" />
+                      <span className="clap-corner clap-corner-bl" />
+                      <span className="clap-corner clap-corner-br" />
+                      <div className="mb-5 flex items-center gap-3">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 text-amber-300">
+                          <Award size={17} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-bold text-white">
+                            Sign-in methods
+                          </h3>
+                          <p className="text-xs text-slate-500">
+                            Connect Google to this account so you can log in
+                            without a password
+                          </p>
+                        </div>
+                      </div>
+
+                      {hasGoogleLinked ? (
+                        <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3">
+                          <GoogleIcon size={18} />
+                          <div className="flex-1">
+                            <div className="text-sm font-semibold text-white">
+                              Google connected
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              You can sign in with Google on this account.
+                            </div>
+                          </div>
+                          <CheckCircle2
+                            size={16}
+                            className="text-emerald-400 shrink-0"
+                          />
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                          <div className="flex-1 text-xs text-slate-400">
+                            Link your Google account to sign in without a
+                            password. Use a Google account with the same email
+                            as this one for a seamless link.
+                          </div>
+                          <motion.button
+                            type="button"
+                            whileTap={{ scale: 0.97 }}
+                            onClick={handleLinkGoogle}
+                            disabled={authLoading}
+                            className="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-white hover:bg-slate-100 px-5 py-2.5 text-xs font-bold text-slate-800 transition-all disabled:opacity-60 shadow-[0_10px_28px_rgba(255,255,255,0.12)]"
+                          >
+                            {authLoading ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <GoogleIcon size={14} />
+                            )}
+                            {authLoading ? "Connecting…" : "Connect Google"}
+                          </motion.button>
+                        </div>
+                      )}
                     </motion.section>
 
                     {/* --- Danger zone --- */}
