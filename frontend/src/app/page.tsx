@@ -11,7 +11,13 @@ import {
   type ReactNode,
 } from "react";
 import { createClient } from "@supabase/supabase-js";
-import { motion, AnimatePresence, type Variants } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useScroll,
+  useTransform,
+  type Variants,
+} from "framer-motion";
 import {
   Search,
   Star,
@@ -206,11 +212,11 @@ const AnimatedBackground = () => {
   );
 };
 
-// Cinema marquee light strip fixed to the very top of the app
+// Cinema marquee light strip along the clapboard's top edge
 const MarqueeLights = () => (
   <div
     aria-hidden="true"
-    className="pointer-events-none fixed inset-x-0 top-0 z-40 flex h-8 items-center justify-between bg-[#0a0a12]/95 px-3"
+    className="pointer-events-none flex h-7 items-center justify-between bg-black/25 px-3"
   >
     {Array.from({ length: 44 }).map((_, i) => (
       <span
@@ -221,6 +227,29 @@ const MarqueeLights = () => (
     ))}
   </div>
 );
+
+// Home-only scroll progress: a film-strip line of sprocket ticks at the bottom
+// of the clapboard header that fills with chalk white as the page scrolls.
+function FilmScrollProgress() {
+  const { scrollYProgress } = useScroll();
+  return (
+    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-[3px] overflow-hidden bg-white/10">
+      {/* sprocket ticks */}
+      <div
+        className="absolute inset-0 opacity-50"
+        style={{
+          backgroundImage:
+            "repeating-linear-gradient(90deg, transparent 0 10px, rgba(244,241,234,0.55) 10px 13px, transparent 13px 23px)",
+        }}
+      />
+      {/* chalk-white fill */}
+      <motion.div
+        className="absolute inset-y-0 left-0 bg-[#f4f1ea] shadow-[0_0_8px_rgba(244,241,234,0.8)]"
+        style={{ scaleX: scrollYProgress }}
+      />
+    </div>
+  );
+}
 
 // --- Film clapboard components ---
 
@@ -449,6 +478,144 @@ function FilmReelStrip({
           <div className="film-reel-sprockets" />
         </div>
       </div>
+    </div>
+  );
+}
+
+// The classic slate body: a black board divided by crisp white field
+// separators into the metadata cells every director fills in — SCENE |
+// TAKE | ROLL up top, then DATE / PROD.CO. / SOUND, DIRECTOR, CAMERAMAN.
+// Used as the header of every home section so the page reads as a stack
+// of clapboards.
+function SlateBoard({
+  scene,
+  take,
+  roll,
+  date,
+  prod = "CINEFINDER",
+  sound = "STEREO",
+  director,
+  cameraman = "YOU",
+  className = "",
+  size = "md",
+}: {
+  scene?: string;
+  take?: string;
+  roll?: string;
+  date?: string;
+  prod?: string;
+  sound?: string;
+  director?: string;
+  cameraman?: string;
+  className?: string;
+  size?: "sm" | "md";
+}) {
+  const tight = size === "sm";
+  const cell = tight ? "px-2.5 py-1" : "px-3 py-1.5";
+  const label = tight ? "text-[7px]" : "text-[8px]";
+  const value = tight ? "text-[10px]" : "text-[11px]";
+  return (
+    <div
+      className={`clap-board relative w-full overflow-hidden rounded-lg border border-white/10 shadow-[0_18px_45px_rgba(0,0,0,0.4)] ${className}`}
+    >
+      {/* Clapper-arm stripe band along the board's top edge */}
+      <div className="clap-stripes h-2 opacity-90" />
+      <div className="divide-y divide-white/15">
+        {/* SCENE | TAKE | ROLL */}
+        <div className="grid grid-cols-3 divide-x divide-white/15">
+          <div className={cell}>
+            <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+              Scene
+            </div>
+            <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+              {scene || "—"}
+            </div>
+          </div>
+          <div className={cell}>
+            <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+              Take
+            </div>
+            <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+              {take || "—"}
+            </div>
+          </div>
+          <div className={cell}>
+            <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+              Roll
+            </div>
+            <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+              {roll || "—"}
+            </div>
+          </div>
+        </div>
+        {/* DATE | PROD.CO. | SOUND */}
+        <div className="grid grid-cols-3 divide-x divide-white/15">
+          <div className={cell}>
+            <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+              Date
+            </div>
+            <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+              {date || "—"}
+            </div>
+          </div>
+          <div className={cell}>
+            <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+              Prod. Co.
+            </div>
+            <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+              {prod}
+            </div>
+          </div>
+          <div className={cell}>
+            <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+              Sound
+            </div>
+            <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+              {sound}
+            </div>
+          </div>
+        </div>
+        {/* DIRECTOR */}
+        <div className={cell}>
+          <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+            Director
+          </div>
+          <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+            {director || "—"}
+          </div>
+        </div>
+        {/* CAMERAMAN */}
+        <div className={cell}>
+          <div className={`font-mono font-bold uppercase tracking-[0.2em] text-[#f4f1ea]/45 ${label}`}>
+            Cameraman
+          </div>
+          <div className={`font-mono font-semibold text-[#f4f1ea]/95 ${value}`}>
+            {cameraman}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Framed board container: a clapboard body with viewfinder corners, used to
+// box up each home section's content so the whole page is a stack of slates.
+function SlateFrame({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`clap-board relative rounded-3xl border border-white/10 p-5 sm:p-8 ${className}`}
+    >
+      <span className="clap-corner clap-corner-tl" />
+      <span className="clap-corner clap-corner-tr" />
+      <span className="clap-corner clap-corner-bl" />
+      <span className="clap-corner clap-corner-br" />
+      {children}
     </div>
   );
 }
@@ -1219,6 +1386,19 @@ export default function CineFinder() {
     prevTabRef.current = activeTab;
   }, [activeTab]);
 
+  // Home-page scroll choreography: the hero parallaxes + fades away as you
+  // scroll, and the header's film-strip progress line fills.
+  const heroRef = useRef<HTMLElement>(null);
+  const { scrollYProgress: heroScroll } = useScroll({
+    target: heroRef,
+    offset: ["start start", "end start"],
+  });
+  const heroBgY = useTransform(heroScroll, [0, 1], [0, 200]);
+  const heroBgScale = useTransform(heroScroll, [0, 1], [1, 1.15]);
+  const heroBgOpacity = useTransform(heroScroll, [0, 0.65], [1, 0]);
+  const heroContentY = useTransform(heroScroll, [0, 1], [0, -70]);
+  const heroContentOpacity = useTransform(heroScroll, [0, 0.55], [1, 0]);
+
   // Popular movies used to dress the home page hero collage + film reel
   const [homePosters, setHomePosters] = useState<Movie[]>([]);
   const [homeBackdrop, setHomeBackdrop] = useState<string>("");
@@ -1898,23 +2078,25 @@ export default function CineFinder() {
     <div className="min-h-screen bg-[#030712] text-slate-200 font-sans selection:bg-amber-400/30 relative isolate">
       <VisualSystem />
       <AnimatedBackground />
-      <MarqueeLights />
-
-      {/* Header (sits just below the marquee light strip). On boot and when
-          you return home, the WHOLE bar swings shut like a clapboard arm. */}
-      <header className="sticky top-8 z-50 mt-8 px-3 pt-3 sm:px-5">
-        <div className="relative max-w-6xl mx-auto">
+      {/* The ENTIRE top of the screen is the clapboard: marquee bulbs, stripes,
+          and the nav bar are all one full-width clapper arm that slams down on
+          boot and whenever you return home. */}
+      <header className="sticky top-0 z-50">
+        <div className="relative">
+          {/* White board revealed while the clap arm is lifted; covered on the slam */}
+          <div className="header-clap-reveal" aria-hidden />
           <div
             key={headerClapKey}
-            className="header-clap clap-board px-4 sm:px-5 h-16 flex items-center justify-between rounded-2xl border border-white/[0.08] backdrop-blur-2xl shadow-[0_10px_45px_rgba(2,6,23,0.32)] relative overflow-hidden"
+            className="header-clap clap-board relative overflow-hidden rounded-b-2xl border-b border-white/[0.08] backdrop-blur-2xl shadow-[0_18px_55px_rgba(2,6,23,0.45)]"
           >
-            {/* Clapper-arm stripes fused to the top edge of the header */}
-            <div className="clap-stripes pointer-events-none absolute inset-x-0 top-0 h-2.5 opacity-90" />
-            <span className="clap-corner clap-corner-tl" />
-            <span className="clap-corner clap-corner-tr" />
-            <span className="clap-corner clap-corner-bl" />
-            <span className="clap-corner clap-corner-br" />
+            {/* Marquee bulbs along the clapboard's top edge */}
+            <MarqueeLights />
+            {/* Home-only scroll progress: film ticks fill as you scroll */}
+            {activeTab === "home" && <FilmScrollProgress />}
+            {/* Clapper-arm stripes */}
+            <div className="clap-stripes pointer-events-none h-2.5 opacity-90" />
 
+            <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
             <button
               onClick={() => setActiveTab("home")}
               className="flex items-center gap-2.5 cursor-pointer group"
@@ -2008,6 +2190,7 @@ export default function CineFinder() {
                 )}
               </div>
             </div>
+            </div>
           </div>
         </div>
       </header>
@@ -2024,26 +2207,32 @@ export default function CineFinder() {
             className="w-full bg-[#0a0a0e]"
           >
             {/* ================= HERO ================= */}
-            <section className="relative overflow-hidden bg-[#0a0a0e]">
+            <section ref={heroRef} className="relative overflow-hidden bg-[#0a0a0e]">
               {/* Film-strip sprocket bar across the very top of the page */}
               <div className="film-strip-h absolute inset-x-0 top-0 h-4 opacity-70" />
-              {/* Dimmed cinematic backdrop image (kept dark so text stays readable) */}
+              {/* Dimmed cinematic backdrop — parallax drifts and fades as you scroll */}
               {(homeBackdrop || homeMovies[0]?.poster_path) && (
-                <div className="absolute inset-0">
+                <motion.div
+                  className="absolute inset-0"
+                  style={{ y: heroBgY, scale: heroBgScale, opacity: heroBgOpacity }}
+                >
                   <img
                     src={`${TMDB_CDN_BASE}${homeBackdrop || homeMovies[0]?.poster_path}`}
                     alt=""
                     className="h-full w-full object-cover opacity-[0.16] blur-[2px]"
                   />
                   <div className="absolute inset-0 bg-[#0a0a0e]/60" />
-                </div>
+                </motion.div>
               )}
               <div className="film-grain absolute inset-0" />
               {/* Warm rise from the bottom so the hero melts into the page */}
               <div className="absolute inset-x-0 bottom-0 h-2/3 bg-gradient-to-t from-[#0a0a0e] via-[#0a0a0e]/60 to-transparent" />
 
               <div className="relative mx-auto max-w-6xl px-6 sm:px-10 py-16 sm:py-24 lg:py-28">
-                <div className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]">
+                <motion.div
+                  className="grid items-center gap-14 lg:grid-cols-[1.05fr_0.95fr]"
+                  style={{ y: heroContentY, opacity: heroContentOpacity }}
+                >
                   <div>
                     <motion.div
                       initial={{ opacity: 0, y: 14 }}
@@ -2101,7 +2290,7 @@ export default function CineFinder() {
                       initial={{ opacity: 0, y: 18 }}
                       animate={{ opacity: 1, y: 0 }}
                       transition={{ delay: 0.34 }}
-                      className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3"
+                      className="mt-10 grid grid-cols-3 divide-x divide-white/15 overflow-hidden rounded-xl border border-white/10 bg-[#101016]/60 backdrop-blur"
                     >
                       {[
                         {
@@ -2120,12 +2309,15 @@ export default function CineFinder() {
                           value: averageRating ? averageRating.toFixed(1) : "—",
                         },
                       ].map(({ icon: Icon, label, value }) => (
-                        <div key={label} className="flex items-center gap-2.5">
+                        <div
+                          key={label}
+                          className="flex flex-col items-center gap-1.5 px-3 py-3 text-center"
+                        >
                           <Icon size={15} className="text-amber-300/80" />
                           <span className="text-lg font-bold text-[#f4f1ea]">
                             {value}
                           </span>
-                          <span className="text-xs text-[#cfc9ba]/60">
+                          <span className="text-[10px] font-mono uppercase tracking-[0.14em] text-[#cfc9ba]/60">
                             {label}
                           </span>
                         </div>
@@ -2213,105 +2405,183 @@ export default function CineFinder() {
                     </div>
                   </motion.div>
                   )}
-                </div>
-              </div>
+              </motion.div>
+            </div>
             </section>
 
             {/* ================= FILM REEL ================= */}
-            <section className="mx-auto max-w-6xl px-6 sm:px-10 pt-2 pb-4">
-              <FilmReelStrip movies={homeMovies} onSelect={openMovieDetails} />
+            <div className="slate-rule mx-auto max-w-6xl" />
+            <section className="mx-auto max-w-6xl px-6 sm:px-10 py-14 sm:py-20">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                className="mb-8 mx-auto max-w-2xl"
+              >
+                <SlateBoard
+                  scene="01"
+                  take="1"
+                  roll="A"
+                  date={new Date().toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                  director={userData?.name || "GUEST"}
+                />
+              </motion.div>
+              <SlateFrame>
+                <FilmReelStrip movies={homeMovies} onSelect={openMovieDetails} />
+              </SlateFrame>
             </section>
 
             {/* ================= FOR YOU ================= */}
+            <div className="slate-rule mx-auto max-w-6xl" />
             <section className="mx-auto max-w-6xl px-6 sm:px-10 py-16 sm:py-20">
-              <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-                <div>
-                  <span className="cozy-eyebrow">
-                    <span className="cozy-dot h-1.5 w-1.5 rounded-full bg-amber-300" />
-                    <span className="font-mono text-amber-300">SCENE 02</span>
-                    <span className="opacity-60">—</span>
-                    Handpicked for you
-                  </span>
-                  <h2 className="poster-text mt-5 text-5xl sm:text-6xl leading-[0.95] tracking-[0.01em] text-[#f4f1ea]">
-                    Your next favorite is already waiting.
-                  </h2>
-                  <p className="subtitle-text mt-5 max-w-md text-[15px] leading-relaxed text-white">
-                    We look at the movies you rated highest and quietly line up
-                    the ones most like them — no noise, just your taste.
-                  </p>
-                  <button
-                    onClick={() => goToTab("foryou")}
-                    className="cozy-link mt-7"
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                className="mb-8 mx-auto max-w-2xl"
+              >
+                <SlateBoard
+                  scene="02"
+                  take="2"
+                  roll="B"
+                  date={new Date().toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                  director={userData?.name || "GUEST"}
+                  sound="DOLBY"
+                />
+              </motion.div>
+              <SlateFrame>
+                <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+                  <motion.div
+                    initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+                    whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    viewport={{ once: true, margin: "-80px" }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                   >
-                    Explore your picks <ChevronRight size={16} />
-                  </button>
-                </div>
+                    <span className="cozy-eyebrow">
+                      <span className="cozy-dot h-1.5 w-1.5 rounded-full bg-amber-300" />
+                      <span className="font-mono text-amber-300">SCENE 02</span>
+                      <span className="opacity-60">—</span>
+                      Handpicked for you
+                    </span>
+                    <h2 className="poster-text mt-5 text-5xl sm:text-6xl leading-[0.95] tracking-[0.01em] text-[#f4f1ea]">
+                      Your next favorite is already waiting.
+                    </h2>
+                    <p className="subtitle-text mt-5 max-w-md text-[15px] leading-relaxed text-white">
+                      We look at the movies you rated highest and quietly line
+                      up the ones most like them — no noise, just your taste.
+                    </p>
+                    <button
+                      onClick={() => goToTab("foryou")}
+                      className="cozy-link mt-7"
+                    >
+                      Explore your picks <ChevronRight size={16} />
+                    </button>
+                  </motion.div>
 
-                <div className="flex flex-wrap items-end justify-center gap-5">
-                  {(userData?.personalized_recommendations || [])
-                    .slice(0, 3)
-                    .map((m, i) =>
-                      m.poster_path ? (
-                        <motion.div
-                          key={m.tmdb_id}
-                          initial={{ opacity: 0, y: 22 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true, margin: "-60px" }}
-                          transition={{
-                            delay: i * 0.1,
-                            type: "spring",
-                            stiffness: 150,
-                            damping: 18,
-                          }}
-                          onClick={() => openMovieDetails(m.tmdb_id)}
-                          role="button"
-                          aria-label={`Open ${m.title}`}
-                          className={`w-28 cursor-pointer sm:w-32 ${
-                            i === 1 ? "sm:-translate-y-4" : ""
-                          }`}
+                  <div className="flex flex-wrap items-end justify-center gap-5">
+                    {(userData?.personalized_recommendations || [])
+                      .slice(0, 3)
+                      .map((m, i) =>
+                        m.poster_path ? (
+                          <motion.div
+                            key={m.tmdb_id}
+                            initial={{ opacity: 0, y: 22 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-60px" }}
+                            transition={{
+                              delay: i * 0.1,
+                              type: "spring",
+                              stiffness: 150,
+                              damping: 18,
+                            }}
+                            onClick={() => openMovieDetails(m.tmdb_id)}
+                            role="button"
+                            aria-label={`Open ${m.title}`}
+                            className={`w-28 cursor-pointer sm:w-32 ${
+                              i === 1 ? "sm:-translate-y-4" : ""
+                            }`}
+                          >
+                            <TiltLayer intensity={9} className="w-full">
+                              <img
+                                src={`${TMDB_CDN_BASE}${m.poster_path}`}
+                                alt={m.title}
+                                className="w-full rounded-xl shadow-[0_22px_45px_rgba(0,0,0,0.5)] ring-1 ring-[#f4f1ea]/15"
+                              />
+                            </TiltLayer>
+                            <p className="mt-2 truncate text-center text-xs font-medium text-[#cfc9ba]/70">
+                              {m.title}
+                            </p>
+                          </motion.div>
+                        ) : null,
+                      )}
+                    {!userData?.personalized_recommendations?.length && (
+                      <div className="cozy-card relative w-full max-w-xs rounded-[1.75rem] p-7 text-center">
+                        <p className="chalk-text text-2xl text-[#f4f1ea]">
+                          Rate a few movies first
+                        </p>
+                        <p className="subtitle-text mt-2 text-sm leading-relaxed text-white">
+                          Your picks appear here once you've rated some
+                          favorites in your watchlist.
+                        </p>
+                        <button
+                          onClick={() => goToTab("watchlist")}
+                          className="cozy-link mt-4 justify-center"
                         >
-                          <TiltLayer intensity={9} className="w-full">
-                            <img
-                              src={`${TMDB_CDN_BASE}${m.poster_path}`}
-                              alt={m.title}
-                              className="w-full rounded-xl shadow-[0_22px_45px_rgba(0,0,0,0.5)] ring-1 ring-[#f4f1ea]/15"
-                            />
-                          </TiltLayer>
-                          <p className="mt-2 truncate text-center text-xs font-medium text-[#cfc9ba]/70">
-                            {m.title}
-                          </p>
-                        </motion.div>
-                      ) : null,
+                          Rate movies <ChevronRight size={16} />
+                        </button>
+                      </div>
                     )}
-                  {!userData?.personalized_recommendations?.length && (
-                    <div className="cozy-card relative w-full max-w-xs rounded-[1.75rem] p-7 text-center">
-                      <p className="chalk-text text-2xl text-[#f4f1ea]">
-                        Rate a few movies first
-                      </p>
-                      <p className="subtitle-text mt-2 text-sm leading-relaxed text-white">
-                        Your picks appear here once you've rated some favorites
-                        in your watchlist.
-                      </p>
-                      <button
-                        onClick={() => goToTab("watchlist")}
-                        className="cozy-link mt-4 justify-center"
-                      >
-                        Rate movies <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              </SlateFrame>
             </section>
 
             {/* ================= COMBO ================= */}
+            <div className="slate-rule mx-auto max-w-6xl" />
             <section className="relative overflow-hidden bg-[#0d0d12]">
               <div className="film-grain absolute inset-0" />
               <div className="film-strip-h absolute inset-x-0 top-0 h-4 opacity-60" />
               <div className="relative mx-auto max-w-6xl px-6 sm:px-10 py-20 sm:py-28">
+                <motion.div
+                  initial={{ opacity: 0, y: 24 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: "-60px" }}
+                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                  className="mb-8 mx-auto max-w-2xl"
+                >
+                  <SlateBoard
+                    scene="03"
+                    take="3"
+                    roll="C"
+                    date={new Date().toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "2-digit",
+                      year: "numeric",
+                    })}
+                    director={userData?.name || "GUEST"}
+                    sound="5.1 MIX"
+                  />
+                </motion.div>
+                <SlateFrame>
                 <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
                   {/* Blend visual */}
-                  <div className="relative order-2 mx-auto flex h-72 w-full max-w-md items-center justify-center lg:order-1">
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.85, rotate: -3 }}
+                    whileInView={{ opacity: 1, scale: 1, rotate: 0 }}
+                    viewport={{ once: true, margin: "-80px" }}
+                    transition={{ type: "spring", stiffness: 120, damping: 16 }}
+                    className="relative order-2 mx-auto flex h-72 w-full max-w-md items-center justify-center lg:order-1"
+                  >
                     <div className="flex items-center gap-3">
                       {homeMovies.slice(0, 2).map((m, i) => (
                         <div
@@ -2342,9 +2612,15 @@ export default function CineFinder() {
                         className="absolute -bottom-2 left-1/2 h-[10.5rem] w-28 -translate-x-1/2 cursor-pointer rounded-xl shadow-[0_24px_50px_rgba(0,0,0,0.5)] ring-1 ring-[#f4f1ea]/15"
                       />
                     )}
-                  </div>
+                  </motion.div>
                   {/* Text */}
-                  <div className="order-1 lg:order-2">
+                  <motion.div
+                    initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+                    whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    viewport={{ once: true, margin: "-80px" }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                    className="order-1 lg:order-2"
+                  >
                     <span className="cozy-eyebrow">
                       <span className="font-mono text-amber-300">SCENE 03</span>
                       <span className="opacity-60">—</span>
@@ -2364,79 +2640,115 @@ export default function CineFinder() {
                     >
                       Start a blend <ChevronRight size={16} />
                     </button>
-                  </div>
+                  </motion.div>
                 </div>
+                </SlateFrame>
               </div>
             </section>
 
             {/* ================= WATCHLIST ================= */}
+            <div className="slate-rule mx-auto max-w-6xl" />
             <section className="mx-auto max-w-6xl px-6 sm:px-10 py-20 sm:py-28">
-              <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
-                <div>
-                  <span className="cozy-eyebrow">
-                    <span className="cozy-dot h-1.5 w-1.5 rounded-full bg-amber-300" />
-                    <span className="font-mono text-amber-300">SCENE 04</span>
-                    <span className="opacity-60">—</span>
-                    Your shelf
-                  </span>
-                  <h2 className="poster-text mt-5 text-5xl sm:text-6xl leading-[0.95] tracking-[0.01em] text-[#f4f1ea]">
-                    Everything you've saved, in one place.
-                  </h2>
-                  <p className="subtitle-text mt-5 max-w-md text-[15px] leading-relaxed text-white">
-                    Keep a collection of all your watched movies, rate what
-                    you've seen, and sort your shelf however you like.
-                  </p>
-                  <button
-                    onClick={() => goToTab("watchlist")}
-                    className="cozy-link mt-7"
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                className="mb-8 mx-auto max-w-2xl"
+              >
+                <SlateBoard
+                  scene="04"
+                  take="4"
+                  roll="D"
+                  date={new Date().toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "2-digit",
+                    year: "numeric",
+                  })}
+                  director={userData?.name || "GUEST"}
+                  sound="SYNC"
+                />
+              </motion.div>
+              <SlateFrame>
+                <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
+                  <motion.div
+                    initial={{ opacity: 0, y: 28, filter: "blur(8px)" }}
+                    whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+                    viewport={{ once: true, margin: "-80px" }}
+                    transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
                   >
-                    Open your watchlist <ChevronRight size={16} />
-                  </button>
-                </div>
+                    <span className="cozy-eyebrow">
+                      <span className="cozy-dot h-1.5 w-1.5 rounded-full bg-amber-300" />
+                      <span className="font-mono text-amber-300">SCENE 04</span>
+                      <span className="opacity-60">—</span>
+                      Your shelf
+                    </span>
+                    <h2 className="poster-text mt-5 text-5xl sm:text-6xl leading-[0.95] tracking-[0.01em] text-[#f4f1ea]">
+                      Everything you've saved, in one place.
+                    </h2>
+                    <p className="subtitle-text mt-5 max-w-md text-[15px] leading-relaxed text-white">
+                      Keep a collection of all your watched movies, rate what
+                      you've seen, and sort your shelf however you like.
+                    </p>
+                    <button
+                      onClick={() => goToTab("watchlist")}
+                      className="cozy-link mt-7"
+                    >
+                      Open your watchlist <ChevronRight size={16} />
+                    </button>
+                  </motion.div>
 
-                <div className="flex items-center gap-3 overflow-x-auto pb-2">
-                  {allRatings
-                    .slice(0, 6)
-                    .map((m) =>
-                      m.poster_path ? (
-                        <motion.img
-                          key={m.tmdb_id}
-                          initial={{ opacity: 0, y: 18 }}
-                          whileInView={{ opacity: 1, y: 0 }}
-                          viewport={{ once: true, margin: "-60px" }}
-                          src={`${TMDB_CDN_BASE}${m.poster_path}`}
-                          alt={m.title}
-                          onClick={() => openMovieDetails(m.tmdb_id)}
-                          role="button"
-                          aria-label={`Open ${m.title}`}
-                          className="h-44 w-29 shrink-0 cursor-pointer rounded-xl object-cover shadow-[0_20px_40px_rgba(0,0,0,0.45)] ring-1 ring-[#f4f1ea]/15 transition-transform hover:scale-105"
-                        />
-                      ) : null,
+                  <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                    {allRatings
+                      .slice(0, 6)
+                      .map((m) =>
+                        m.poster_path ? (
+                          <motion.img
+                            key={m.tmdb_id}
+                            initial={{ opacity: 0, y: 18 }}
+                            whileInView={{ opacity: 1, y: 0 }}
+                            viewport={{ once: true, margin: "-60px" }}
+                            src={`${TMDB_CDN_BASE}${m.poster_path}`}
+                            alt={m.title}
+                            onClick={() => openMovieDetails(m.tmdb_id)}
+                            role="button"
+                            aria-label={`Open ${m.title}`}
+                            className="h-44 w-29 shrink-0 cursor-pointer rounded-xl object-cover shadow-[0_20px_40px_rgba(0,0,0,0.45)] ring-1 ring-[#f4f1ea]/15 transition-transform hover:scale-105"
+                          />
+                        ) : null,
+                      )}
+                    {!allRatings.length && (
+                      <div className="cozy-card relative w-full rounded-[1.75rem] p-7 text-center">
+                        <p className="chalk-text text-2xl text-[#f4f1ea]">
+                          Your shelf is empty
+                        </p>
+                        <p className="subtitle-text mt-2 text-sm leading-relaxed text-white">
+                          Add movies from the top of the watchlist page and
+                          they'll show up right here.
+                        </p>
+                        <button
+                          onClick={() => goToTab("watchlist")}
+                          className="cozy-link mt-4 justify-center"
+                        >
+                          Open watchlist <ChevronRight size={16} />
+                        </button>
+                      </div>
                     )}
-                  {!allRatings.length && (
-                    <div className="cozy-card relative w-full rounded-[1.75rem] p-7 text-center">
-                      <p className="chalk-text text-2xl text-[#f4f1ea]">
-                        Your shelf is empty
-                      </p>
-                      <p className="subtitle-text mt-2 text-sm leading-relaxed text-white">
-                        Add movies from the top of the watchlist page and
-                        they'll show up right here.
-                      </p>
-                      <button
-                        onClick={() => goToTab("watchlist")}
-                        className="cozy-link mt-4 justify-center"
-                      >
-                        Open watchlist <ChevronRight size={16} />
-                      </button>
-                    </div>
-                  )}
+                  </div>
                 </div>
-              </div>
+              </SlateFrame>
             </section>
 
             {/* ================= SETTINGS FOOTER ================= */}
+            <div className="slate-rule mx-auto max-w-6xl" />
             <section className="mx-auto max-w-6xl px-6 sm:px-10 pb-24">
-              <div className="cozy-card relative flex flex-col items-start justify-between gap-6 rounded-[2rem] p-8 sm:flex-row sm:items-center sm:p-10">
+              <motion.div
+                initial={{ opacity: 0, y: 24 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, margin: "-60px" }}
+                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
+                className="cozy-card relative flex flex-col items-start justify-between gap-6 rounded-[2rem] p-8 sm:flex-row sm:items-center sm:p-10"
+              >
                 <span className="clap-corner clap-corner-tl" />
                 <span className="clap-corner clap-corner-tr" />
                 <span className="clap-corner clap-corner-bl" />
@@ -2480,7 +2792,7 @@ export default function CineFinder() {
                     </button>
                   )}
                 </div>
-              </div>
+              </motion.div>
             </section>
           </motion.div>
         )}

@@ -402,6 +402,35 @@ body {
   backdrop-filter: blur(1px);
 }
 
+/* Crisp white divider rule between slate sections — like the field
+   separators on a real clapboard, with a small diamond scene marker. */
+.slate-rule {
+  position: relative;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(244, 241, 234, 0.28) 12%,
+    rgba(244, 241, 234, 0.6) 50%,
+    rgba(244, 241, 234, 0.28) 88%,
+    transparent 100%
+  );
+}
+
+.slate-rule::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: #f4f1ea;
+  box-shadow:
+    0 0 6px rgba(244, 241, 234, 0.45),
+    0 0 16px rgba(244, 241, 234, 0.18);
+}
+
 /* Horizontal film strip: sprocket holes along the top and bottom */
 .film-strip-h {
   background-image:
@@ -442,35 +471,61 @@ body {
     clap-idle 6s ease-in-out 1.4s infinite;
 }
 
-/* Header clapper: hinged at its LEFT edge, the header tilts so the right end
-   lifts up (the clapper arm being opened), then slams back down flat with a
-   springy overshoot and a white flash — the classic up-then-shut clap. */
+/* Header clapper: the ENTIRE width of the screen is the clapper arm — marquee
+   bulbs, stripes, and nav are one full-width board. It pivots on a big hinge
+   at its top-left corner, so while it is lifted you see the white board
+   (header-clap-reveal) underneath it; as it slams shut, that white space is
+   covered back up — the classic clap. The angle stays small because the arm
+   spans the full viewport (a few degrees already lifts the right edge ~100px). */
 .header-clap {
-  transform-origin: left center;
-  animation: header-clap 1.2s cubic-bezier(0.34, 0.1, 0.2, 1) forwards;
+  position: relative;
+  z-index: 10;
+  transform-origin: left top;
+  animation: header-clap 1.3s cubic-bezier(0.34, 0.1, 0.2, 1) forwards;
   will-change: transform;
 }
 
 @keyframes header-clap {
   0% {
-    transform: rotate(-20deg);
+    transform: rotate(-5deg);
     opacity: 0;
   }
-  35% {
+  12% {
     opacity: 1;
   }
-  60% {
-    transform: rotate(3deg);
+  50% {
+    transform: rotate(1.2deg);
   }
-  78% {
-    transform: rotate(-1.5deg);
+  70% {
+    transform: rotate(-0.5deg);
   }
   100% {
     transform: rotate(0deg);
   }
 }
 
-/* White camera-flash that pops right as the header snaps shut. */
+/* White board that lives BEHIND the clap arm while it is up. Its top edge
+   carries the same diagonal stripes, so it reads as the underside of the
+   clapper arm being revealed. It disappears as the arm slams down over it. */
+.header-clap-reveal {
+  position: absolute;
+  inset: 0;
+  border-radius: 0 0 1rem 1rem;
+  background: linear-gradient(180deg, #faf7f0 0%, #efe9db 100%);
+  box-shadow: 0 20px 55px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+.header-clap-reveal::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 12px;
+  background: repeating-linear-gradient(-45deg, #0c0c10 0 10px, #f4f1ea 10px 20px);
+  opacity: 0.92;
+}
+
+/* White camera-flash that pops right as the clap arm snaps shut. */
 .header-clap::after {
   content: "";
   position: absolute;
@@ -480,16 +535,16 @@ body {
   opacity: 0;
   pointer-events: none;
   z-index: 40;
-  animation: header-clap-flash 1.2s ease-out forwards;
+  animation: header-clap-flash 1.3s ease-out forwards;
 }
 
 @keyframes header-clap-flash {
   0%,
-  50% {
+  44% {
     opacity: 0;
   }
-  62% {
-    opacity: 0.9;
+  54% {
+    opacity: 0.95;
   }
   100% {
     opacity: 0;
