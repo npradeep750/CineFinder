@@ -122,16 +122,150 @@ def popularity_token(popularity) -> str:
 def build_hybrid_feature(
     keywords: str, genres: str, rating_tok: str, popularity_tok: str
 ) -> str:
+    # Genres weigh more than keywords so a single shared keyword (e.g. "based on
+    # novel") can't dominate; rating tokens are repeated so high-rated movies
+    # genuinely matter, not just a single token lost in the noise.
     parts: List[str] = []
     if keywords:
-        parts.append((keywords + " ") * 3)
+        parts.append((keywords + " ") * 2)
     if genres:
-        parts.append((genres + " ") * 2)
+        parts.append((genres + " ") * 3)
     if rating_tok:
-        parts.append(rating_tok)
+        parts.append((rating_tok + " ") * 2)
     if popularity_tok:
         parts.append(popularity_tok)
     return " ".join(parts)
+
+
+def quality_factor(vote_average) -> float:
+    """Map a TMDB 0-10 rating to a 0.75..1.0 quality multiplier so highly-rated
+    movies float above equally-similar but poorly-rated ones."""
+    try:
+        v = float(vote_average)
+    except (TypeError, ValueError):
+        v = 0.0
+    if v <= 0:
+        return 0.75
+    # 5.0 -> 0.75, 6.5 -> 0.875, 8.0+ -> 1.0
+    quality = min(1.0, max(0.0, (v - 5.0) / 3.0))
+    return round(0.75 + 0.25 * quality, 4)
+
+
+def genre_overlap_factor(movie_genres: str, user_genres: set) -> float:
+    """Boost movies that share genres with the viewer's taste and demote ones that
+    share none (e.g. a romance film that only matched on a generic keyword)."""
+    if not user_genres or not movie_genres:
+        return 1.0
+    shared = len(set(movie_genres.split()) & user_genres)
+    if shared >= 2:
+        return 1.15
+    if shared == 1:
+        return 1.0
+    return 0.85
+
+
+def popularity_factor(popularity) -> float:
+    """Boost more popular movies — ones people have actually watched. TMDB
+    popularity is heavily skewed (median ~10, mega-hits 100+), so the curve
+    differentiates most in the 6-60 range."""
+    try:
+        p = float(popularity)
+    except (TypeError, ValueError):
+        p = 0.0
+    if p >= 60: return 1.0
+    if p >= 30: return 0.95
+    if p >= 18: return 0.88
+    if p >= 12: return 0.8
+    if p >= 8: return 0.68
+    return 0.55
+
+
+def keyword_sparsity_factor(keywords) -> float:
+    """Down-weight films with little/no keyword data — they have less signal and
+    tend to be less watched/popular. ~85% of the catalog has 8+ keywords, so this
+    only really punishes the sparse tail."""
+    if isinstance(keywords, list):
+        count = len(keywords)
+    else:
+        count = len(str(keywords or "").split())
+    if count >= 8: return 1.0
+    if count >= 5: return 0.9
+    if count >= 3: return 0.78
+    if count >= 2: return 0.65
+    if count >= 1: return 0.55
+    return 0.45
+
+
+def _metadata_dims(m: dict) -> dict:
+    """Normalize a movie's metadata into the same 0-100 dimensions as the combo
+    radar chart: score index, release recency, keyword richness, title length.
+    Only dimensions with real data are returned."""
+    dims = {}
+    try:
+        v = float(m.get("vote_average") or 0)
+        if v > 0:
+            dims["score"] = min(100.0, v * 10.0)
+    except (TypeError, ValueError):
+        pass
+
+    try:
+        year = int(str(m.get("release_date") or "")[:4])
+        if year > 0:
+            current = time.localtime().tm_year
+            dims["recency"] = max(
+                0.0, min(100.0, (year - 1950) / max(1, current - 1950) * 100.0)
+            )
+    except (TypeError, ValueError):
+        pass
+
+    kw = m.get("keywords") or ""
+    if isinstance(kw, list):
+        kw_count = len(kw)
+    else:
+        kw_count = len(str(kw).split())
+    if kw_count > 0:
+        dims["richness"] = min(100.0, kw_count / 20.0 * 100.0)
+
+    title = str(m.get("title") or "")
+    if title:
+        dims["title"] = min(100.0, len(title) / 30.0 * 100.0)
+
+    return dims
+
+
+# How much each radar dimension weighs when matching a candidate's metadata
+# profile against the combo/user's profile. "score" is excluded on purpose: it
+# is already rewarded by quality_factor, so matching it again would double count.
+METADATA_DIM_WEIGHTS = {"recency": 0.4, "richness": 0.4, "title": 0.2}
+
+
+def metadata_match_factor(cand_dims: dict, profile_dims: dict) -> float:
+    """Weighted closeness (0..1) between a candidate's metadata and the
+    combo/user's average profile. Returns 1.0 (neutral) when there's no overlap."""
+    if not profile_dims:
+        return 1.0
+    total_w = 0.0
+    acc = 0.0
+    for dim, w in METADATA_DIM_WEIGHTS.items():
+        if dim in cand_dims and dim in profile_dims:
+            closeness = 1.0 - min(1.0, abs(cand_dims[dim] - profile_dims[dim]) / 100.0)
+            acc += w * closeness
+            total_w += w
+    if total_w == 0:
+        return 1.0
+    return round(acc / total_w, 4)
+
+
+def average_profile_dims(movies: List[dict]) -> dict:
+    """Average per-dimension metadata across a set of movies (per-dimension
+    averaging so movies missing one dimension don't skew the others)."""
+    sums: Dict[str, float] = {}
+    counts: Dict[str, int] = {}
+    for m in movies:
+        for dim, val in _metadata_dims(m).items():
+            sums[dim] = sums.get(dim, 0.0) + val
+            counts[dim] = counts.get(dim, 0) + 1
+    return {dim: sums[dim] / counts[dim] for dim in sums}
 
 
 def get_username(user_id: str) -> str:
@@ -198,6 +332,7 @@ def _fetch_catalog_rows() -> List[dict]:
                 "genres": genres,
                 "vote_average": m.get("vote_average") or 0,
                 "popularity": m.get("popularity") or 0,
+                "release_date": m.get("release_date") or "",
             })
 
     print(f"🚀 Fetching TMDB keywords for {len(rows)} movies...")
@@ -248,6 +383,11 @@ def load_catalog_and_build_vectors():
             "tmdb_id": row["tmdb_id"],
             "title": row["title"],
             "poster_path": row["poster_path"],
+            "genres": row.get("genres", ""),
+            "vote_average": row.get("vote_average") or 0,
+            "popularity": row.get("popularity") or 0,
+            "release_date": row.get("release_date") or "",
+            "keywords": row.get("keywords", ""),
         }
         movies_list.append(movie_obj)
         id_to_movie[row["tmdb_id"]] = movie_obj
@@ -462,8 +602,21 @@ def get_user_history(user=Depends(get_current_user)):
     movies_list = CATALOG_CACHE["movies_list"]
     tfidf_matrix = CATALOG_CACHE["hybrid_matrix"]
     id_to_idx = CATALOG_CACHE["id_to_idx"]
+    id_to_movie = CATALOG_CACHE["id_to_movie"]
 
     if tfidf_matrix is not None and user_ratings:
+        # Taste profile: the set of genres across the user's rated movies.
+        user_genres = set()
+        rated_movies = []
+        for t_id, rating_val in user_ratings.items():
+            if rating_val > 0 and t_id in id_to_movie:
+                user_genres.update(id_to_movie[t_id].get("genres", "").split())
+                rated_movies.append(id_to_movie[t_id])
+
+        # Metadata profile (recency / keyword richness / title length) of the
+        # user's rated movies, mirroring the combo-search radar chart.
+        profile_dims = average_profile_dims(rated_movies)
+
         weighted_vectors = []
         for t_id, rating_val in user_ratings.items():
             if t_id in id_to_idx and rating_val > 0:
@@ -491,19 +644,36 @@ def get_user_history(user=Depends(get_current_user)):
             if unwatched_indices:
                 unwatched_matrix = tfidf_matrix[unwatched_indices]
                 sim_scores = cosine_similarity(user_profile_vec, unwatched_matrix)[0]
-                scored = sorted(zip(unwatched_movies, sim_scores), key=lambda x: x[1], reverse=True)
-                
+                # Blend cosine similarity with genre overlap + quality so highly
+                # rated, genre-relevant movies rank above generic keyword matches.
+                scored = []
+                for m, s in zip(unwatched_movies, sim_scores):
+                    if s <= 0.05:
+                        continue
+                    title_clean = m["title"].strip().lower()
+                    if title_clean in watched_titles:
+                        continue
+                    blended = float(s) * genre_overlap_factor(
+                        m.get("genres", ""), user_genres
+                    ) * quality_factor(m.get("vote_average")) * metadata_match_factor(
+                        _metadata_dims(m), profile_dims
+                    ) * popularity_factor(m.get("popularity")) * keyword_sparsity_factor(
+                        m.get("keywords")
+                    )
+                    scored.append((m, blended))
+                scored.sort(key=lambda x: x[1], reverse=True)
+
                 seen_rec_titles = set(watched_titles)
                 
-                for m, s in scored:
+                for m, blended in scored:
                     title_clean = m["title"].strip().lower()
-                    if s > 0.05 and title_clean not in seen_rec_titles:
+                    if title_clean not in seen_rec_titles:
                         seen_rec_titles.add(title_clean)
                         personalized_recommendations.append({
                             "tmdb_id": m["tmdb_id"],
                             "title": m["title"],
                             "poster_path": m.get("poster_path") or "",
-                            "score": round(float(s), 4)
+                            "score": round(blended, 4)
                         })
                         if len(personalized_recommendations) == 50:
                             break
@@ -605,12 +775,16 @@ def get_recommendations(body: RecommendRequest):
 
     hybrid_vectors = []
     selected_titles = set()
+    selected_genres = set()
+    selected_meta = []
 
     for t_id in body.tmdb_ids:
         if t_id in id_to_idx:
             idx = id_to_idx[t_id]
             hybrid_vectors.append(hybrid_matrix[idx].toarray()[0])
             selected_titles.add(id_to_movie[t_id]["title"].strip().lower())
+            selected_genres.update(id_to_movie[t_id].get("genres", "").split())
+            selected_meta.append(id_to_movie[t_id])
         else:
             try:
                 details_res = requests.get(
@@ -633,6 +807,13 @@ def get_recommendations(body: RecommendRequest):
                             [build_hybrid_feature(keywords_str, genres, rtok, ptok)]
                         ).toarray()[0]
                     )
+                    selected_genres.update(genres.split())
+                    selected_meta.append({
+                        "title": title,
+                        "keywords": keywords_str,
+                        "vote_average": details.get("vote_average") or 0,
+                        "release_date": details.get("release_date") or "",
+                    })
                     if title:
                         selected_titles.add(title.strip().lower())
             except Exception as e:
@@ -642,26 +823,43 @@ def get_recommendations(body: RecommendRequest):
     if not hybrid_vectors:
         raise HTTPException(status_code=404, detail="Could not process any of the selected movies.")
 
+    # Average metadata profile (recency / keyword richness / title length) of the
+    # selected movies, mirroring the combo-search radar chart.
+    profile_dims = average_profile_dims(selected_meta)
+
     def rank(vectors, matrix):
         if not vectors or matrix is None:
             return []
         blended = np.mean(vectors, axis=0).reshape(1, -1)
         sims = cosine_similarity(blended, matrix)[0]
-        scored = sorted(zip(movies_list, sims), key=lambda x: x[1], reverse=True)
-        results = []
+        # Blend cosine similarity with genre overlap + quality + metadata profile
+        # so highly rated, genre-relevant movies that match the combo's era and
+        # richness rank above generic single-keyword matches.
+        scored = []
         seen = set(selected_titles)
-        for m, s in scored:
+        for m, s in zip(movies_list, sims):
+            if m["tmdb_id"] in body.tmdb_ids:
+                continue
             norm_title = m["title"].strip().lower()
-            if m["tmdb_id"] not in body.tmdb_ids and norm_title not in seen:
-                seen.add(norm_title)
-                results.append({
-                    "tmdb_id": m["tmdb_id"],
-                    "title": m["title"],
-                    "poster_path": m.get("poster_path") or "",
-                    "score": round(float(s), 4),
-                })
-                if len(results) == RECOMMENDATION_LIMIT:
-                    break
+            if norm_title in seen:
+                continue
+            final = float(s) * genre_overlap_factor(
+                m.get("genres", ""), selected_genres
+            ) * quality_factor(m.get("vote_average")) * metadata_match_factor(
+                _metadata_dims(m), profile_dims
+            ) * popularity_factor(m.get("popularity")) * keyword_sparsity_factor(
+                m.get("keywords")
+            )
+            scored.append((m, final))
+        scored.sort(key=lambda x: x[1], reverse=True)
+        results = []
+        for m, final in scored[:RECOMMENDATION_LIMIT]:
+            results.append({
+                "tmdb_id": m["tmdb_id"],
+                "title": m["title"],
+                "poster_path": m.get("poster_path") or "",
+                "score": round(final, 4),
+            })
         return results
 
     return {

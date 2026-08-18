@@ -601,7 +601,6 @@ function MovieCard({
   actionIcon: ActionIcon,
   matchScore,
   onCardClick,
-  showChrome = true,
 }: {
   movie: Movie;
   onAction: () => void;
@@ -609,7 +608,6 @@ function MovieCard({
   actionIcon: any;
   matchScore?: number;
   onCardClick?: () => void;
-  showChrome?: boolean;
 }) {
   const matchPct =
     matchScore !== undefined ? Math.min(1, Math.max(0, matchScore)) : 0;
@@ -626,14 +624,6 @@ function MovieCard({
       onClick={onCardClick}
       className="group relative bg-[#090D16]/85 rounded-2xl overflow-hidden border border-white/[0.07] hover:border-amber-400/60 transition-all duration-500 cursor-pointer shadow-[0_18px_50px_rgba(2,6,23,0.4)] hover:shadow-[0_26px_70px_rgba(217,119,6,0.25)] flex flex-col h-full"
     >
-      {showChrome && (
-        <>
-          <span className="clap-corner clap-corner-tl" />
-          <span className="clap-corner clap-corner-tr" />
-          <span className="clap-corner clap-corner-bl" />
-          <span className="clap-corner clap-corner-br" />
-        </>
-      )}
       <div
         ref={posterRef}
         className="aspect-[2/3] bg-slate-900 relative overflow-hidden"
@@ -706,11 +696,6 @@ function MovieCard({
 
       <div className="absolute bottom-0 inset-x-0 p-4 bg-gradient-to-t from-[#020617] via-[#020617]/95 to-transparent pt-10">
         <div className="mb-2 flex items-center justify-between gap-2">
-          {showChrome && (
-            <span className="rounded-full border border-amber-300/20 bg-amber-300/10 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300 backdrop-blur-md">
-              In production
-            </span>
-          )}
           {movie.release_date && (
             <span className="text-[10px] font-medium text-slate-300">
               {movie.release_date.split("-")[0]}
@@ -776,7 +761,6 @@ function RecommendationSection({
             actionLabel="Add to Watchlist"
             actionIcon={CheckCircle2}
             matchScore={m.score}
-            showChrome={false}
             onAction={() => onAction(m)}
             onCardClick={() => onCardClick(m.tmdb_id)}
           />
@@ -1053,6 +1037,165 @@ function GoogleIcon({ size = 18 }: { size?: number }) {
         d="M43.6 20.1H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C36.9 39.2 44 34 44 24c0-1.3-.1-2.6-.4-3.9z"
       />
     </svg>
+  );
+}
+
+// The sign-in card: username/email + password form, Google button, and the
+// sign-up toggle. Shown on the home page until the user signs in.
+function AuthCard({
+  id,
+  isRegistering,
+  onToggleRegister,
+  authForm,
+  setAuthForm,
+  authLoading,
+  error,
+  onSubmit,
+  onGoogle,
+  loginSubmitRef,
+  googleBtnRef,
+}: {
+  id?: string;
+  isRegistering: boolean;
+  onToggleRegister: () => void;
+  authForm: { identifier: string; email: string; password: string; username: string };
+  setAuthForm: (f: any) => void;
+  authLoading: boolean;
+  error: string;
+  onSubmit: (e: FormEvent) => void;
+  onGoogle: () => void;
+  loginSubmitRef?: RefObject<HTMLButtonElement | null>;
+  googleBtnRef?: RefObject<HTMLButtonElement | null>;
+}) {
+  const inputCls =
+    "w-full bg-black/50 border border-white/10 text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400/70 focus:ring-4 focus:ring-amber-400/10 transition-all placeholder:text-slate-600";
+  return (
+    <div
+      id={id}
+      className="clap-board relative rounded-3xl p-7 border border-white/[0.08] backdrop-blur-xl shadow-[0_24px_70px_rgba(0,0,0,0.5)]"
+    >
+      <span className="clap-corner clap-corner-tl" />
+      <span className="clap-corner clap-corner-tr" />
+      <span className="clap-corner clap-corner-bl" />
+      <span className="clap-corner clap-corner-br" />
+      <div className="film-tape absolute -top-2 left-1/2 h-4 w-24 -translate-x-1/2" />
+
+      <div className="mb-5 text-center">
+        <div className="inline-flex items-center gap-2 font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-amber-300">
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-300" />
+          Scene 00 · Box office
+        </div>
+        <h3 className="chalk-text mt-2 text-3xl text-[#f4f1ea]">
+          {isRegistering ? "Join the show" : "Sign in"}
+        </h3>
+        <p className="subtitle-text mt-1 text-sm text-white/80">
+          {isRegistering
+            ? "Create an account to start your shelf."
+            : "Unlock your watchlist, blends & picks."}
+        </p>
+      </div>
+
+      {error && (
+        <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
+          <X size={14} /> {error}
+        </div>
+      )}
+      <form onSubmit={onSubmit} className="space-y-3.5">
+        <AnimatePresence>
+          {isRegistering && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="space-y-3.5 overflow-hidden"
+            >
+              <input
+                type="text"
+                placeholder="Username"
+                required
+                className={inputCls}
+                onChange={(e) =>
+                  setAuthForm({ ...authForm, username: e.target.value })
+                }
+              />
+              <input
+                type="email"
+                placeholder="Email"
+                required
+                className={inputCls}
+                onChange={(e) =>
+                  setAuthForm({ ...authForm, email: e.target.value })
+                }
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {!isRegistering && (
+          <input
+            type="text"
+            placeholder="Username or Email"
+            required
+            className={inputCls}
+            onChange={(e) =>
+              setAuthForm({ ...authForm, identifier: e.target.value })
+            }
+          />
+        )}
+        <input
+          type="password"
+          placeholder="Password"
+          required
+          className={inputCls}
+          onChange={(e) =>
+            setAuthForm({ ...authForm, password: e.target.value })
+          }
+        />
+        <motion.button
+          ref={loginSubmitRef}
+          whileTap={{ scale: 0.98 }}
+          type="submit"
+          disabled={authLoading}
+          className="w-full bg-gradient-to-r from-[#23232c] via-[#1c1c24] to-[#14141a] hover:brightness-125 text-[#f3efe4] font-bold text-sm rounded-xl py-3 mt-2 transition-all shadow-[0_12px_32px_rgba(0,0,0,0.45)] ring-1 ring-white/25 disabled:brightness-75"
+        >
+          {authLoading ? (
+            <div className="w-4 h-4 border-2 border-amber-900/30 border-t-amber-900 rounded-full animate-spin mx-auto" />
+          ) : isRegistering ? (
+            "Create Account"
+          ) : (
+            "Log In"
+          )}
+        </motion.button>
+      </form>
+
+      <div className="my-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-white/10" />
+        <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
+          or
+        </span>
+        <span className="h-px flex-1 bg-white/10" />
+      </div>
+
+      <button
+        ref={googleBtnRef}
+        type="button"
+        onClick={onGoogle}
+        disabled={authLoading}
+        className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-sm rounded-xl py-3 transition-all disabled:opacity-60 shadow-[0_10px_28px_rgba(255,255,255,0.12)]"
+      >
+        <GoogleIcon size={18} />
+        Continue with Google
+      </button>
+
+      <button
+        type="button"
+        onClick={onToggleRegister}
+        className="w-full mt-5 text-slate-400 hover:text-white text-xs transition-colors"
+      >
+        {isRegistering
+          ? "Already have an account? Log in"
+          : "Don't have an account? Sign up"}
+      </button>
+    </div>
   );
 }
 
@@ -1358,7 +1501,11 @@ export default function CineFinder() {
     } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
       if (session?.access_token) fetchUserData(session.access_token);
-      else setUserData(null);
+      else {
+        setUserData(null);
+        // Sign-out always lands back on the (public) home page.
+        setActiveTab("home");
+      }
     });
     return () => subscription.unsubscribe();
   }, []);
@@ -1628,6 +1775,34 @@ export default function CineFinder() {
     }
   };
 
+  // Tab navigation guard: For You / Combo / Watchlist / Settings require a
+  // session. If the user isn't signed in, stay on home and nudge them to the
+  // sign-in card.
+  const PROTECTED_LABELS: Record<string, string> = {
+    foryou: "For You",
+    combo: "Combo Search",
+    watchlist: "Watchlist",
+    settings: "Settings",
+  };
+  const goToTab = (
+    tab: "home" | "foryou" | "combo" | "watchlist" | "settings",
+  ) => {
+    if (tab !== "home" && !session) {
+      setActiveTab("home");
+      pushToast(
+        `Sign in to open ${PROTECTED_LABELS[tab] || "that"}`,
+        "info",
+      );
+      window.setTimeout(() => {
+        document
+          .getElementById("auth-card")
+          ?.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 150);
+      return;
+    }
+    setActiveTab(tab);
+  };
+
   // --- Settings: link a previously existing account to Google ---
   // Uses Supabase's linkIdentity: while signed in with email/password, this
   // runs the Google OAuth flow and attaches the Google identity to the
@@ -1719,153 +1894,6 @@ export default function CineFinder() {
     }
   };
 
-  if (!session) {
-    return (
-      <div className="min-h-screen bg-[#030712] flex flex-col items-center justify-center p-4 relative isolate font-sans">
-        <VisualSystem />
-        <AnimatedBackground />
-        <MarqueeLights />
-
-        <motion.div
-          initial={{ y: 20, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="w-full max-w-sm relative z-10"
-        >
-          <div className="text-center mb-9 flex flex-col items-center">
-            <motion.div
-              initial={{ y: -30, opacity: 0, rotate: -4 }}
-              animate={{ y: 0, opacity: 1, rotate: 0 }}
-              transition={{ type: "spring", stiffness: 200, damping: 18 }}
-              className="relative"
-            >
-              <ClapSlate
-                size="md"
-                scene="01"
-                take="01"
-                title={"CineFinder"}
-                subtitle={
-                  <>
-                    <span className="text-amber-300">your next obsession</span>
-                  </>
-                }
-              />
-            </motion.div>
-          </div>
-
-          <div className="clap-board relative rounded-3xl p-8 border border-white/[0.08] backdrop-blur-xl">
-            <span className="clap-corner clap-corner-tl" />
-            <span className="clap-corner clap-corner-tr" />
-            <span className="clap-corner clap-corner-bl" />
-            <span className="clap-corner clap-corner-br" />
-            <div className="film-tape absolute -top-2 left-1/2 h-4 w-24 -translate-x-1/2" />
-            {error && (
-              <div className="mb-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 text-xs rounded-xl flex items-center gap-2">
-                <X size={14} /> {error}
-              </div>
-            )}
-            <form onSubmit={handleAuth} className="space-y-3.5">
-              <AnimatePresence>
-                {isRegistering && (
-                  <motion.div
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
-                    exit={{ height: 0, opacity: 0 }}
-                    className="space-y-3.5 overflow-hidden"
-                  >
-                    <input
-                      type="text"
-                      placeholder="Username"
-                      required
-                      className="w-full bg-black/50 border border-white/10 text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400/70 focus:ring-4 focus:ring-amber-400/10 transition-all placeholder:text-slate-600"
-                      onChange={(e) =>
-                        setAuthForm({ ...authForm, username: e.target.value })
-                      }
-                    />
-                    <input
-                      type="email"
-                      placeholder="Email"
-                      required
-                      className="w-full bg-black/50 border border-white/10 text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400/70 focus:ring-4 focus:ring-amber-400/10 transition-all placeholder:text-slate-600"
-                      onChange={(e) =>
-                        setAuthForm({ ...authForm, email: e.target.value })
-                      }
-                    />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              {!isRegistering && (
-                <input
-                  type="text"
-                  placeholder="Username or Email"
-                  required
-                  className="w-full bg-black/50 border border-white/10 text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400/70 focus:ring-4 focus:ring-amber-400/10 transition-all placeholder:text-slate-600"
-                  onChange={(e) =>
-                    setAuthForm({ ...authForm, identifier: e.target.value })
-                  }
-                />
-              )}
-              <input
-                type="password"
-                placeholder="Password"
-                required
-                className="w-full bg-black/50 border border-white/10 text-white rounded-xl px-4 py-3 text-sm outline-none focus:border-amber-400/70 focus:ring-4 focus:ring-amber-400/10 transition-all placeholder:text-slate-600"
-                onChange={(e) =>
-                  setAuthForm({ ...authForm, password: e.target.value })
-                }
-              />
-              <motion.button
-                ref={loginSubmitRef}
-                whileTap={{ scale: 0.98 }}
-                type="submit"
-                disabled={authLoading}
-                className="w-full bg-gradient-to-r from-[#23232c] via-[#1c1c24] to-[#14141a] hover:brightness-125 text-[#f3efe4] font-bold text-sm rounded-xl py-3 mt-2 transition-all shadow-[0_12px_32px_rgba(0,0,0,0.45)] ring-1 ring-white/25 disabled:brightness-75"
-              >
-                {authLoading ? (
-                  <div className="w-4 h-4 border-2 border-amber-900/30 border-t-amber-900 rounded-full animate-spin mx-auto" />
-                ) : isRegistering ? (
-                  "Create Account"
-                ) : (
-                  "Log In"
-                )}
-              </motion.button>
-            </form>
-
-            <div className="my-5 flex items-center gap-3">
-              <span className="h-px flex-1 bg-white/10" />
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-slate-500">
-                or
-              </span>
-              <span className="h-px flex-1 bg-white/10" />
-            </div>
-
-            <button
-              ref={googleBtnRef}
-              type="button"
-              onClick={handleGoogleLogin}
-              disabled={authLoading}
-              className="w-full flex items-center justify-center gap-3 bg-white hover:bg-slate-100 text-slate-800 font-semibold text-sm rounded-xl py-3 transition-all disabled:opacity-60 shadow-[0_10px_28px_rgba(255,255,255,0.12)]"
-            >
-              <GoogleIcon size={18} />
-              Continue with Google
-            </button>
-
-            <button
-              onClick={() => {
-                setIsRegistering(!isRegistering);
-                setError("");
-              }}
-              className="w-full mt-5 text-slate-400 hover:text-white text-xs transition-colors"
-            >
-              {isRegistering
-                ? "Already have an account? Log in"
-                : "Don't have an account? Sign up"}
-            </button>
-          </div>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-[#030712] text-slate-200 font-sans selection:bg-amber-400/30 relative isolate">
       <VisualSystem />
@@ -1920,7 +1948,7 @@ export default function CineFinder() {
                 ].map((tab) => (
                   <button
                     key={tab.id}
-                    onClick={() => setActiveTab(tab.id as any)}
+                    onClick={() => goToTab(tab.id as any)}
                     className={`relative px-4 py-1.5 text-xs font-medium transition-colors z-10 ${
                       activeTab === tab.id
                         ? "text-white"
@@ -1944,22 +1972,40 @@ export default function CineFinder() {
               </nav>
 
               <div className="flex items-center gap-2 pl-4 border-l border-white/[0.08]">
-                <button
-                  onClick={() => setActiveTab("settings")}
-                  className={`p-2 rounded-full transition-colors ${
-                    activeTab === "settings"
-                      ? "text-amber-400 bg-amber-400/10"
-                      : "text-slate-400 hover:text-white hover:bg-white/5"
-                  }`}
-                >
-                  <Settings size={18} />
-                </button>
-                <button
-                  onClick={() => supabase.auth.signOut()}
-                  className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-full transition-colors"
-                >
-                  <LogOut size={18} />
-                </button>
+                {session ? (
+                  <>
+                    <button
+                      onClick={() => goToTab("settings")}
+                      className={`p-2 rounded-full transition-colors ${
+                        activeTab === "settings"
+                          ? "text-amber-400 bg-amber-400/10"
+                          : "text-slate-400 hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <Settings size={18} />
+                    </button>
+                    <button
+                      onClick={() => supabase.auth.signOut()}
+                      className="p-2 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-full transition-colors"
+                    >
+                      <LogOut size={18} />
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    onClick={() =>
+                      document
+                        .getElementById("auth-card")
+                        ?.scrollIntoView({
+                          behavior: "smooth",
+                          block: "center",
+                        })
+                    }
+                    className="clap-stripes-amber rounded-full px-4 py-1.5 text-xs font-bold text-[#f2eee3] transition-all hover:-translate-y-0.5 ring-1 ring-black/40"
+                  >
+                    Sign in
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -2037,17 +2083,17 @@ export default function CineFinder() {
                     >
                       <button
                         ref={heroBrowseRef}
-                        onClick={() => setActiveTab("foryou")}
+                        onClick={() => goToTab("foryou")}
                         className="clap-stripes-amber rounded-full px-6 py-3 text-sm font-bold text-[#f2eee3] shadow-[0_14px_34px_rgba(0,0,0,0.45)] transition-all hover:-translate-y-0.5 ring-1 ring-black/40"
                       >
-                        Browse your picks
+                        {session ? "Browse your picks" : "Sign in to browse"}
                       </button>
                       <button
                         ref={heroBlendRef}
-                        onClick={() => setActiveTab("combo")}
+                        onClick={() => goToTab("combo")}
                         className="rounded-full border border-[#f4f1ea]/30 px-6 py-3 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-white/5"
                       >
-                        Start a blend
+                        {session ? "Start a blend" : "Sign in to blend"}
                       </button>
                     </motion.div>
 
@@ -2087,7 +2133,39 @@ export default function CineFinder() {
                     </motion.div>
                   </div>
 
-                  {/* Hero poster collage */}
+                  {/* Hero right column: the sign-in card is the first thing
+                      logged-out visitors see; the poster collage shows once
+                      they're signed in. */}
+                  {!session ? (
+                    <motion.div
+                      initial={{ opacity: 0, y: 20, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{
+                        delay: 0.2,
+                        type: "spring",
+                        stiffness: 120,
+                        damping: 16,
+                      }}
+                      className="relative mx-auto w-full max-w-sm scroll-mt-40"
+                    >
+                      <AuthCard
+                        id="auth-card"
+                        isRegistering={isRegistering}
+                        onToggleRegister={() => {
+                          setIsRegistering(!isRegistering);
+                          setError("");
+                        }}
+                        authForm={authForm}
+                        setAuthForm={setAuthForm}
+                        authLoading={authLoading}
+                        error={error}
+                        onSubmit={handleAuth}
+                        onGoogle={handleGoogleLogin}
+                        loginSubmitRef={loginSubmitRef}
+                        googleBtnRef={googleBtnRef}
+                      />
+                    </motion.div>
+                  ) : (
                   <motion.div
                     initial={{ opacity: 0, scale: 0.94 }}
                     animate={{ opacity: 1, scale: 1 }}
@@ -2134,6 +2212,7 @@ export default function CineFinder() {
                       ▸ fresh from the shelf
                     </div>
                   </motion.div>
+                  )}
                 </div>
               </div>
             </section>
@@ -2161,7 +2240,7 @@ export default function CineFinder() {
                     the ones most like them — no noise, just your taste.
                   </p>
                   <button
-                    onClick={() => setActiveTab("foryou")}
+                    onClick={() => goToTab("foryou")}
                     className="cozy-link mt-7"
                   >
                     Explore your picks <ChevronRight size={16} />
@@ -2214,7 +2293,7 @@ export default function CineFinder() {
                         in your watchlist.
                       </p>
                       <button
-                        onClick={() => setActiveTab("watchlist")}
+                        onClick={() => goToTab("watchlist")}
                         className="cozy-link mt-4 justify-center"
                       >
                         Rate movies <ChevronRight size={16} />
@@ -2280,7 +2359,7 @@ export default function CineFinder() {
                       you didn't know you were looking for.
                     </p>
                     <button
-                      onClick={() => setActiveTab("combo")}
+                      onClick={() => goToTab("combo")}
                       className="cozy-link mt-7"
                     >
                       Start a blend <ChevronRight size={16} />
@@ -2308,7 +2387,7 @@ export default function CineFinder() {
                     you've seen, and sort your shelf however you like.
                   </p>
                   <button
-                    onClick={() => setActiveTab("watchlist")}
+                    onClick={() => goToTab("watchlist")}
                     className="cozy-link mt-7"
                   >
                     Open your watchlist <ChevronRight size={16} />
@@ -2344,7 +2423,7 @@ export default function CineFinder() {
                         they'll show up right here.
                       </p>
                       <button
-                        onClick={() => setActiveTab("watchlist")}
+                        onClick={() => goToTab("watchlist")}
                         className="cozy-link mt-4 justify-center"
                       >
                         Open watchlist <ChevronRight size={16} />
@@ -2373,17 +2452,33 @@ export default function CineFinder() {
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
-                    onClick={() => setActiveTab("settings")}
+                    onClick={() => goToTab("settings")}
                     className="clap-stripes-amber rounded-full px-5 py-2.5 text-sm font-bold text-[#f2eee3] transition-colors ring-1 ring-black/40"
                   >
                     Settings
                   </button>
-                  <button
-                    onClick={() => supabase.auth.signOut()}
-                    className="rounded-full border border-[#f4f1ea]/25 px-5 py-2.5 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-white/5"
-                  >
-                    Sign out
-                  </button>
+                  {session ? (
+                    <button
+                      onClick={() => supabase.auth.signOut()}
+                      className="rounded-full border border-[#f4f1ea]/25 px-5 py-2.5 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-white/5"
+                    >
+                      Sign out
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        document
+                          .getElementById("auth-card")
+                          ?.scrollIntoView({
+                            behavior: "smooth",
+                            block: "center",
+                          })
+                      }
+                      className="rounded-full border border-[#f4f1ea]/25 px-5 py-2.5 text-sm font-semibold text-[#f4f1ea] transition-colors hover:bg-white/5"
+                    >
+                      Sign in
+                    </button>
+                  )}
                 </div>
               </div>
             </section>
@@ -2490,7 +2585,7 @@ export default function CineFinder() {
                         suggestions.
                       </p>
                       <button
-                        onClick={() => setActiveTab("combo")}
+                        onClick={() => goToTab("combo")}
                         className="px-5 py-2 bg-white text-black text-xs font-semibold rounded-full hover:bg-slate-200 transition-colors"
                       >
                         Start Searching
@@ -2735,7 +2830,7 @@ export default function CineFinder() {
                     <div className="space-y-12">
                       <RecommendationSection
                         title="Matches"
-                        subtitle="Recommended by keywords, genres, and ratings/popularity."
+                        subtitle="Blended by keywords, genres, ratings, popularity, and your combo's metadata profile (era, richness)."
                         results={hybridResults}
                         onAction={(movie) => handleAddToWatchlist(movie)}
                         onCardClick={openMovieDetails}
@@ -3173,7 +3268,7 @@ export default function CineFinder() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => setActiveTab("combo")}
+                          onClick={() => goToTab("combo")}
                           className="clap-stripes-amber px-5 py-2 text-[#f2eee3] text-xs font-bold rounded-full hover:brightness-110 transition-all shadow-lg shadow-black/30 ring-1 ring-black/40"
                         >
                           Find Movies
@@ -3494,7 +3589,7 @@ export default function CineFinder() {
           <motion.button
             key={id}
             whileTap={{ scale: 0.92 }}
-            onClick={() => setActiveTab(id as "foryou" | "combo" | "watchlist")}
+            onClick={() => goToTab(id as any)}
             className={`flex h-10 min-w-10 items-center justify-center gap-1.5 rounded-xl px-3 text-[10px] font-bold transition-all ${activeTab === id ? "clap-stripes-amber text-[#f2eee3] shadow-lg shadow-black/30 ring-1 ring-black/40" : "text-slate-400"}`}
             aria-label={label}
           >
