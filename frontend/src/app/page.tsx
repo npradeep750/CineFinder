@@ -13,9 +13,12 @@ import {
 import { createClient } from "@supabase/supabase-js";
 import {
   motion,
+  MotionConfig,
   AnimatePresence,
   useScroll,
   useTransform,
+  useAnimationFrame,
+  useMotionValue,
   type Variants,
 } from "framer-motion";
 import {
@@ -419,11 +422,13 @@ function CameraReel({
   );
 }
 
-// Scrolling film reel: a strip of poster frames threads sideways inside a
-// real-looking film strip — white sprocket holes along the top and bottom
-// edges, and each poster mounted in a white rounded frame. Every frame opens
-// the movie's details modal when clicked.
-function FilmReelStrip({
+// "Now screening" — one single row of posters that fills the width of the
+// section and never stops scrolling. The track is advanced every frame from a
+// motion value (rather than a CSS keyframe, which the app's global
+// prefers-reduced-motion override would freeze) and wraps back to the start
+// every time it travels the width of one full pass, so the loop is seamless.
+// Hovering pauses it, and every poster opens the movie's details modal.
+function NowScreeningGallery({
   movies,
   label = "Now screening",
   onSelect,
@@ -432,9 +437,56 @@ function FilmReelStrip({
   label?: string;
   onSelect: (tmdb_id: number) => void;
 }) {
+  const viewportRef = useRef<HTMLDivElement>(null);
+  const [cellWidth, setCellWidth] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const trackX = useMotionValue(0);
+
+  // The row only renders once movies arrive, so the measurement has to be
+  // keyed on that too — otherwise it would only ever run against a missing
+  // element and the row would never get a width.
+  const mounted = movies.length > 0;
+
+  // Size the row to an exact number of posters that edge-to-edge fills the
+  // section, re-measuring whenever the viewport changes.
+  useEffect(() => {
+    const el = viewportRef.current;
+    if (!el) return;
+    const measure = () => {
+      const width = el.getBoundingClientRect().width;
+      if (!width) return;
+      setCellWidth(width / (width >= 1024 ? 7 : width >= 640 ? 5 : 3));
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [mounted]);
+
+  // The caller rebuilds its movie array on every render, so compare identity
+  // by TMDB id rather than by reference.
+  const reelKey = movies.map((m) => m.tmdb_id).join(",");
+
+  // One pass is exactly one cell per movie; two passes make the loop seamless.
+  const reelWidth = movies.length * cellWidth;
+  const travelPerSecond = cellWidth / 1.9;
+
+  useAnimationFrame((_time, delta) => {
+    if (paused || reelWidth <= 0) return;
+    // Distance travelled since the last frame, wrapped into a single pass so
+    // the row can never slide past the end of the duplicated list.
+    const travelled = (-trackX.get() + (delta / 1000) * travelPerSecond) % reelWidth;
+    trackX.set(-travelled);
+  });
+
+  // A new list or a new row width starts the reel over from the first poster.
+  useEffect(() => {
+    trackX.set(0);
+  }, [reelKey, cellWidth, trackX]);
+
   if (movies.length === 0) return null;
-  // Duplicate the list so the -50% translateX loop is seamless.
-  const loop = [...movies, ...movies];
+
+  const reel = [...movies, ...movies];
 
   return (
     <div className="relative">
@@ -447,36 +499,41 @@ function FilmReelStrip({
         <span className="h-px w-12 bg-white/15" />
       </div>
 
-      {/* Film strip: the whole reel scrolls as one unit — the white sprocket
-          holes along the top and bottom edges spin together with the frames. */}
-      <div className="film-reel-strip relative overflow-hidden border border-white/10 py-4">
-        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-16 bg-gradient-to-r from-black to-transparent" />
-        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-16 bg-gradient-to-l from-black to-transparent" />
+      <div
+        ref={viewportRef}
+        className="now-screening-gallery relative overflow-hidden"
+        onMouseEnter={() => setPaused(true)}
+        onMouseLeave={() => setPaused(false)}
+      >
+        <div className="pointer-events-none absolute inset-y-0 left-0 z-10 w-12 bg-gradient-to-r from-[#0a0a0e] to-transparent" />
+        <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-12 bg-gradient-to-l from-[#0a0a0e] to-transparent" />
 
-        <div className="film-reel-track">
-          <div className="film-reel-sprockets" />
-          <div className="film-reel-frames">
-            {loop.map((m, i) => (
-              <button
-                key={`${m.tmdb_id}-${i}`}
-                type="button"
-                onClick={() => onSelect(m.tmdb_id)}
-                aria-label={`Open ${m.title}`}
-                className="film-frame group cursor-pointer"
-                style={{ animationDelay: `${(i % movies.length) * 0.35}s` }}
-              >
-                <span className="block overflow-hidden rounded-[20px]">
-                  <img
-                    src={`${TMDB_CDN_BASE}${m.poster_path}`}
-                    alt={m.title}
-                    className="h-40 w-28 object-cover transition-transform duration-500 group-hover:scale-110"
-                  />
-                </span>
-              </button>
-            ))}
-          </div>
-          <div className="film-reel-sprockets" />
-        </div>
+        <motion.div
+          className="now-screening-track flex items-start"
+          style={{ x: trackX }}
+        >
+          {reel.map((m, i) => (
+            <button
+              key={`${m.tmdb_id}-${i}`}
+              type="button"
+              onClick={() => onSelect(m.tmdb_id)}
+              aria-label={`Open ${m.title}`}
+              style={{ width: cellWidth || undefined }}
+              className="now-screening-cell group shrink-0 cursor-pointer px-1.5 py-2 text-left"
+            >
+              <span className="now-screening-poster block">
+                <img
+                  src={`${TMDB_CDN_BASE}${m.poster_path}`}
+                  alt={m.title}
+                  className="h-full w-full object-cover"
+                />
+              </span>
+              <span className="mt-2 block truncate font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-slate-400 transition-colors group-hover:text-white">
+                {m.title}
+              </span>
+            </button>
+          ))}
+        </motion.div>
       </div>
     </div>
   );
@@ -608,13 +665,7 @@ function SlateFrame({
   className?: string;
 }) {
   return (
-    <div
-      className={`clap-board relative rounded-3xl border border-white/10 p-5 sm:p-8 ${className}`}
-    >
-      <span className="clap-corner clap-corner-tl" />
-      <span className="clap-corner clap-corner-tr" />
-      <span className="clap-corner clap-corner-bl" />
-      <span className="clap-corner clap-corner-br" />
+    <div className={`landing-flow ${className}`}>
       {children}
     </div>
   );
@@ -745,7 +796,6 @@ const HeroHeadline = memo(function HeroHeadline() {
       <em className="chalk-text text-amber-300 normal-case tracking-normal">
         obsession
       </em>
-      .
     </h1>
   );
 });
@@ -853,8 +903,8 @@ function MovieCard({
                   transition={{ duration: 0.9, ease: "easeOut", delay: 0.25 }}
                 />
               </svg>
-              <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-emerald-400">
-                {(matchPct * 100).toFixed(0)}
+              <span className="absolute inset-0 flex items-center justify-center text-[8px] font-bold text-emerald-400">
+                {(matchPct * 100).toFixed(0)}%
               </span>
             </div>
           </motion.div>
@@ -1385,6 +1435,76 @@ export default function CineFinder() {
     }
     prevTabRef.current = activeTab;
   }, [activeTab]);
+
+  // Every tab remembers its own scroll offset, so switching tabs never
+  // inherits the offset of the tab you were just reading, and returning to a
+  // tab brings you back to where you left it.
+  const scrollMemory = useRef<Record<string, number>>({
+    home: 0,
+    foryou: 0,
+    combo: 0,
+    watchlist: 0,
+    settings: 0,
+  });
+  const activeTabRef = useRef(activeTab);
+  // Set when the user scrolls themselves, so the restore loop below stops
+  // fighting them mid-tab.
+  const userScrolledRef = useRef(false);
+  const lastRestoreScroll = useRef(0);
+
+  useEffect(() => {
+    activeTabRef.current = activeTab;
+    userScrolledRef.current = false;
+    lastRestoreScroll.current = performance.now();
+
+    const target = scrollMemory.current[activeTab] ?? 0;
+    let frame = 0;
+    let attempts = 0;
+    const apply = () => {
+      if (userScrolledRef.current) return;
+      const max = Math.max(
+        0,
+        document.documentElement.scrollHeight - window.innerHeight,
+      );
+      const y = Math.min(target, max);
+      if (Math.abs(window.scrollY - y) > 1) {
+        lastRestoreScroll.current = performance.now();
+        window.scrollTo(0, y);
+      }
+      scrollMemory.current[activeTab] = y;
+      attempts += 1;
+      // Keep re-applying while this tab is still too short to reach the
+      // remembered offset (recommendations and the watchlist load async), and
+      // for a moment after the outgoing tab finishes its exit animation and
+      // the page height settles.
+      if ((y < target || attempts < 45) && attempts < 150) {
+        frame = requestAnimationFrame(apply);
+      }
+    };
+    frame = requestAnimationFrame(apply);
+    return () => cancelAnimationFrame(frame);
+  }, [activeTab]);
+
+  useEffect(() => {
+    let queued = false;
+    const record = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        // Anything the user drives themselves, rather than the restore loop
+        // above, becomes the tab's new remembered offset.
+        if (performance.now() - lastRestoreScroll.current > 300) {
+          userScrolledRef.current = true;
+        }
+        scrollMemory.current[activeTabRef.current] = window.scrollY;
+      });
+    };
+    window.addEventListener("scroll", record, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", record);
+    };
+  }, []);
 
   // Home-page scroll choreography: the hero parallaxes + fades away as you
   // scroll, and the header's film-strip progress line fills.
@@ -2075,50 +2195,27 @@ export default function CineFinder() {
   };
 
   return (
-    <div className="min-h-screen bg-[#030712] text-slate-200 font-sans selection:bg-amber-400/30 relative isolate">
+    <MotionConfig reducedMotion="always">
+    <div className="min-h-screen bg-[#030712] text-slate-200 font-sans selection:bg-amber-400/30 relative isolate app-shell">
       <VisualSystem />
       <AnimatedBackground />
-      {/* The ENTIRE top of the screen is the clapboard: marquee bulbs, stripes,
-          and the nav bar are all one full-width clapper arm that slams down on
-          boot and whenever you return home. */}
-      <header className="sticky top-0 z-50">
-        <div className="relative">
-          {/* White board revealed while the clap arm is lifted; covered on the slam */}
-          <div className="header-clap-reveal" aria-hidden />
-          <div
-            key={headerClapKey}
-            className="header-clap clap-board relative overflow-hidden rounded-b-2xl border-b border-white/[0.08] backdrop-blur-2xl shadow-[0_18px_55px_rgba(2,6,23,0.45)]"
-          >
-            {/* Marquee bulbs along the clapboard's top edge */}
-            <MarqueeLights />
-            {/* Home-only scroll progress: film ticks fill as you scroll */}
-            {activeTab === "home" && <FilmScrollProgress />}
-            {/* Clapper-arm stripes */}
-            <div className="clap-stripes pointer-events-none h-2.5 opacity-90" />
-
-            <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
+      <header className="sticky top-0 z-50 border-b border-white/[0.08] bg-[#0a0b0d]/95 backdrop-blur-xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
             <button
               onClick={() => setActiveTab("home")}
               className="flex items-center gap-2.5 cursor-pointer group"
             >
-              {/* Mini clapboard logo */}
-              <div className="relative h-8 w-9 shrink-0 overflow-hidden rounded-[5px] bg-[#101016] ring-1 ring-white/20 shadow-lg">
-                <div className="clap-stripes absolute inset-x-0 top-0 h-[10px] opacity-90" />
-                <div className="absolute inset-x-0 top-[10px] bottom-0 flex items-center justify-center">
-                  <span className="chalk-text text-[13px] leading-none text-[#f6f1e6]">
-                    C
-                  </span>
-                </div>
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-white/20 bg-white/[0.06] font-semibold text-white">
+                C
               </div>
               <div className="hidden sm:block text-left">
-              <span className="bebas-text block text-[17px] leading-none tracking-[0.08em] text-[#f6f1e6]">
+              <span className="block text-[13px] font-semibold leading-none tracking-[0.16em] text-[#f6f1e6]">
                 CINEFINDER
               </span>
-                <span className="mt-1 block text-[9px] font-bold uppercase tracking-[0.16em] text-amber-300/90">
-                  Roll camera — action
+                <span className="mt-1 block text-[9px] font-medium uppercase tracking-[0.16em] text-slate-400">
+                  Personal recommendations
                 </span>
               </div>
-              <CameraReel size={22} showRec className="hidden md:inline-flex" />
             </button>
 
             <div className="flex items-center gap-4">
@@ -2140,7 +2237,7 @@ export default function CineFinder() {
                     {activeTab === tab.id && (
                       <motion.div
                         layoutId="activeTab"
-                        className="absolute inset-0 clap-stripes-amber rounded-full shadow-[0_5px_16px_rgba(0,0,0,0.4)] -z-10 ring-1 ring-black/40"
+                        className="absolute inset-0 rounded-full bg-white/[0.12] -z-10 ring-1 ring-white/[0.08]"
                         transition={{
                           type: "spring",
                           stiffness: 400,
@@ -2183,15 +2280,13 @@ export default function CineFinder() {
                           block: "center",
                         })
                     }
-                    className="clap-stripes-amber rounded-full px-4 py-1.5 text-xs font-bold text-[#f2eee3] transition-all hover:-translate-y-0.5 ring-1 ring-black/40"
+                    className="rounded-full bg-white px-4 py-1.5 text-xs font-bold text-[#15161a] transition-colors hover:bg-slate-200"
                   >
                     Sign in
                   </button>
                 )}
               </div>
-            </div>
-            </div>
-          </div>
+        </div>
         </div>
       </header>
 
@@ -2409,56 +2504,20 @@ export default function CineFinder() {
             </div>
             </section>
 
-            {/* ================= FILM REEL ================= */}
+            {/* ================= NOW SCREENING ================= */}
             <div className="slate-rule mx-auto max-w-6xl" />
             <section className="mx-auto max-w-6xl px-6 sm:px-10 py-14 sm:py-20">
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                className="mb-8 mx-auto max-w-2xl"
-              >
-                <SlateBoard
-                  scene="01"
-                  take="1"
-                  roll="A"
-                  date={new Date().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "2-digit",
-                    year: "numeric",
-                  })}
-                  director={userData?.name || "GUEST"}
-                />
-              </motion.div>
               <SlateFrame>
-                <FilmReelStrip movies={homeMovies} onSelect={openMovieDetails} />
+                <NowScreeningGallery
+                  movies={homeMovies}
+                  onSelect={openMovieDetails}
+                />
               </SlateFrame>
             </section>
 
             {/* ================= FOR YOU ================= */}
             <div className="slate-rule mx-auto max-w-6xl" />
             <section className="mx-auto max-w-6xl px-6 sm:px-10 py-16 sm:py-20">
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                className="mb-8 mx-auto max-w-2xl"
-              >
-                <SlateBoard
-                  scene="02"
-                  take="2"
-                  roll="B"
-                  date={new Date().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "2-digit",
-                    year: "numeric",
-                  })}
-                  director={userData?.name || "GUEST"}
-                  sound="DOLBY"
-                />
-              </motion.div>
               <SlateFrame>
                 <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
                   <motion.div
@@ -2552,26 +2611,6 @@ export default function CineFinder() {
               <div className="film-grain absolute inset-0" />
               <div className="film-strip-h absolute inset-x-0 top-0 h-4 opacity-60" />
               <div className="relative mx-auto max-w-6xl px-6 sm:px-10 py-20 sm:py-28">
-                <motion.div
-                  initial={{ opacity: 0, y: 24 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: "-60px" }}
-                  transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                  className="mb-8 mx-auto max-w-2xl"
-                >
-                  <SlateBoard
-                    scene="03"
-                    take="3"
-                    roll="C"
-                    date={new Date().toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "2-digit",
-                      year: "numeric",
-                    })}
-                    director={userData?.name || "GUEST"}
-                    sound="5.1 MIX"
-                  />
-                </motion.div>
                 <SlateFrame>
                 <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
                   {/* Blend visual */}
@@ -2649,26 +2688,6 @@ export default function CineFinder() {
             {/* ================= WATCHLIST ================= */}
             <div className="slate-rule mx-auto max-w-6xl" />
             <section className="mx-auto max-w-6xl px-6 sm:px-10 py-20 sm:py-28">
-              <motion.div
-                initial={{ opacity: 0, y: 24 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true, margin: "-60px" }}
-                transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}
-                className="mb-8 mx-auto max-w-2xl"
-              >
-                <SlateBoard
-                  scene="04"
-                  take="4"
-                  roll="D"
-                  date={new Date().toLocaleDateString("en-US", {
-                    month: "short",
-                    day: "2-digit",
-                    year: "numeric",
-                  })}
-                  director={userData?.name || "GUEST"}
-                  sound="SYNC"
-                />
-              </motion.div>
               <SlateFrame>
                 <div className="grid items-center gap-12 lg:grid-cols-2 lg:gap-16">
                   <motion.div
@@ -4076,5 +4095,6 @@ export default function CineFinder() {
         </AnimatePresence>
       </div>
     </div>
+    </MotionConfig>
   );
 }

@@ -1,2 +1,5 @@
 __pycache__/
 catalog_cache.json
+.env
+.env.*
+!.env.example

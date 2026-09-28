@@ -109,6 +109,211 @@ body {
   }
 }
 
+/* Landing sections are intentionally open and editorial rather than boxed-in. */
+.app-shell .landing-flow {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* “Now screening” is a single-row rotating gallery: the posters edge-to-edge
+   fill the section and the row advances one poster at a time. */
+.app-shell .now-screening-gallery {
+  background: transparent;
+}
+
+.app-shell .now-screening-track {
+  will-change: transform;
+}
+
+/* Fallback width so the very first frame is already sane if the row has not
+   been measured yet. */
+.app-shell .now-screening-cell {
+  min-width: 7rem;
+}
+
+.app-shell .now-screening-poster {
+  display: block;
+  height: 9.5rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 0.75rem;
+  background: #17181b;
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.3);
+  transition: transform 0.5s ease, border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.app-shell .now-screening-poster img {
+  display: block;
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transition: transform 0.6s ease;
+}
+
+.app-shell .now-screening-cell:hover .now-screening-poster {
+  transform: translateY(-4px);
+  border-color: rgba(255, 255, 255, 0.32);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.45);
+}
+
+.app-shell .now-screening-cell:hover .now-screening-poster img {
+  transform: scale(1.06);
+}
+
+/* Graphite presentation layer. It keeps the existing application controls and
+   data flows intact while replacing the warm, chalk-forward color cast with a
+   quieter black-and-grey cinema surface. */
+body {
+  background: #08090b;
+  color: #e7e8eb;
+}
+
+.clap-board,
+.cozy-card {
+  background: linear-gradient(145deg, #1c1d22, #101115) !important;
+}
+
+.clap-stripes-amber {
+  background-color: #c8c9cd !important;
+  background-image: repeating-linear-gradient(
+    135deg,
+    #e9eaed 0 11px,
+    #303136 11px 22px
+  ) !important;
+}
+
+.text-amber-300,
+.text-amber-400,
+.text-amber-500 {
+  color: #d7d8dc !important;
+}
+
+.bg-amber-300\/10,
+.bg-amber-400\/10,
+.bg-amber-500\/10 {
+  background-color: rgba(214, 215, 220, 0.1) !important;
+}
+
+.border-amber-300\/25,
+.border-amber-400\/20,
+.border-amber-400\/30 {
+  border-color: rgba(214, 215, 220, 0.28) !important;
+}
+
+.cozy-link {
+  color: #e4e5e8;
+}
+
+.cozy-link::after {
+  background: linear-gradient(90deg, #d7d8dc, transparent 85%);
+}
+
+/* Interaction reset: the original ornamental motion is intentionally removed.
+   MotionConfig disables Framer Motion transforms; this rule stops the legacy
+   CSS choreography so the interface has one calm, predictable motion system. */
+.app-shell *,
+.app-shell *::before,
+.app-shell *::after {
+  animation: none !important;
+}
+
+/* New graphite interface language: low-noise panels, quick feedback, and
+   only deliberate hover/focus transitions. */
+.app-shell {
+  background: #0a0b0d !important;
+  color: #e8e9ec;
+}
+
+.app-shell .clap-stripes,
+.app-shell .header-clap-reveal,
+.app-shell .marquee-bulb,
+.app-shell .film-strip-h,
+.app-shell .sprocket-strip,
+.app-shell .film-tape {
+  display: none !important;
+}
+
+/* Legacy primary-button class is retained in JSX for compatibility, but it is
+   now a flat graphite surface—never a stripe treatment. */
+.app-shell .clap-stripes-amber {
+  background: #e7e8eb !important;
+  background-image: none !important;
+  color: #17181b !important;
+}
+
+.app-shell .chalk-text,
+.app-shell em {
+  font-style: normal !important;
+}
+
+.app-shell .header-clap,
+.app-shell .clap-board,
+.app-shell .cozy-card {
+  background: rgba(20, 21, 25, 0.9) !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.26) !important;
+}
+
+.app-shell .chalk-text,
+.app-shell .bebas-text,
+.app-shell .poster-text {
+  font-family: var(--font-fraunces), Georgia, serif !important;
+  filter: none !important;
+  letter-spacing: -0.035em !important;
+}
+
+.app-shell .cozy-eyebrow,
+.app-shell .font-mono {
+  color: #aeb0b7 !important;
+}
+
+.app-shell .text-amber-300,
+.app-shell .text-amber-400,
+.app-shell .text-emerald-400,
+.app-shell .text-indigo-400 {
+  color: #d9dadd !important;
+}
+
+.app-shell button,
+.app-shell a {
+  transition: background-color 160ms ease, border-color 160ms ease,
+    color 160ms ease, box-shadow 160ms ease, transform 160ms ease !important;
+}
+
+.app-shell button:hover:not(:disabled),
+.app-shell a:hover {
+  transform: translateY(-2px) !important;
+}
+
+.app-shell button:active:not(:disabled) {
+  transform: translateY(0) scale(0.98) !important;
+}
+
+.app-shell .group:hover {
+  border-color: rgba(255, 255, 255, 0.27) !important;
+  box-shadow: 0 22px 44px rgba(0, 0, 0, 0.34) !important;
+}
+
+.app-shell img {
+  filter: grayscale(0.55) contrast(1.04);
+  transition: filter 220ms ease, transform 220ms ease !important;
+}
+
+.app-shell .group:hover img {
+  filter: grayscale(0.12) contrast(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell button:hover:not(:disabled),
+  .app-shell a:hover,
+  .app-shell button:active:not(:disabled) {
+    transform: none !important;
+  }
+}
+
 /* Subtle film grain over the whole app */
 .film-grain {
   pointer-events: none;
